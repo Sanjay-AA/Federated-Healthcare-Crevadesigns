@@ -1,5 +1,16 @@
 import React, { useState, useEffect } from 'react';
+import { 
+  getPHCs, 
+  getMedicines, 
+  getAlerts, 
+  getTransfers, 
+  getDiseaseReports, 
+  getFederatedModel, 
+  getCountries, 
+  getDistricts 
+} from "./lib/firestore";
 import { mockPhcs } from './data/mockPhcs';
+import { mockMedicines } from './data/mockMedicines';
 import Dashboard from './pages/Dashboard';
 import PhcDetail from './pages/PhcDetail';
 import FederatedIntelligence from './pages/FederatedIntelligence';
@@ -12,6 +23,76 @@ function App() {
   const [activeTab, setActiveTab] = useState('dashboard');
   const [districtFilter, setDistrictFilter] = useState('All');
   const [liveTimestamp, setLiveTimestamp] = useState('');
+
+  // Firestore collections state
+  const [phcs, setPhcs] = useState([]);
+  const [medicines, setMedicines] = useState([]);
+  const [alerts, setAlerts] = useState([]);
+  const [transfers, setTransfers] = useState([]);
+  const [diseaseReports, setDiseaseReports] = useState([]);
+  const [federatedModel, setFederatedModel] = useState(null);
+  const [countries, setCountries] = useState([]);
+  const [districts, setDistricts] = useState([]);
+
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
+
+  useEffect(() => {
+    let isMounted = true;
+
+    async function loadFirestoreData() {
+      try {
+        setLoading(true);
+        setError(null);
+
+        const [
+          phcData,
+          medData,
+          alertData,
+          transferData,
+          reportData,
+          fedData,
+          countryData,
+          districtData
+        ] = await Promise.all([
+          getPHCs(),
+          getMedicines(),
+          getAlerts(),
+          getTransfers(),
+          getDiseaseReports(),
+          getFederatedModel(),
+          getCountries(),
+          getDistricts()
+        ]);
+
+        if (isMounted) {
+          setPhcs(phcData && phcData.length > 0 ? phcData : mockPhcs);
+          setMedicines(medData && medData.length > 0 ? medData : mockMedicines);
+          setAlerts(alertData || []);
+          setTransfers(transferData || []);
+          setDiseaseReports(reportData || []);
+          setFederatedModel(fedData && fedData.length > 0 ? fedData[0] : null);
+          setCountries(countryData || []);
+          setDistricts(districtData || []);
+          setLoading(false);
+        }
+      } catch (err) {
+        console.error("Firestore loading error:", err);
+        if (isMounted) {
+          setError("Unable to connect to local Firestore Emulator. Loaded fallback reference dataset.");
+          setPhcs(mockPhcs);
+          setMedicines(mockMedicines);
+          setLoading(false);
+        }
+      }
+    }
+
+    loadFirestoreData();
+
+    return () => {
+      isMounted = false;
+    };
+  }, []);
 
   // Update live clock in 12-hour format: "04:39 PM"
   useEffect(() => {
@@ -137,7 +218,7 @@ function App() {
             ● ALL SYSTEMS OPERATIONAL
           </div>
           <div className="text-[9px] text-[#64748B] font-bold tracking-wider font-mono uppercase bg-slate-50 p-1.5 rounded border border-slate-200 text-center">
-            PRODUCTION · SECURE
+            EMULATOR · SECURE
           </div>
         </div>
       </aside>
@@ -178,9 +259,9 @@ function App() {
                   className="bg-white border border-slate-200 rounded px-2.5 py-1 text-xs text-[#0F172A] font-medium outline-none cursor-pointer hover:border-slate-300 transition-colors"
                 >
                   <option value="All">All Districts</option>
-                  <option value="Salem">Salem</option>
-                  <option value="Erode">Erode</option>
-                  <option value="Namakkal">Namakkal</option>
+                  {(districts && districts.length > 0 ? districts.map(d => d.name) : ['Salem', 'Erode', 'Namakkal']).map((dName) => (
+                    <option key={dName} value={dName}>{dName}</option>
+                  ))}
                 </select>
               </div>
             )}
@@ -189,33 +270,76 @@ function App() {
 
         {/* Dynamic Panel Workspace */}
         <main className="flex-1 overflow-y-auto px-8 py-6">
+          {error && (
+            <div className="mb-4 p-3 bg-amber-50 border border-amber-200 text-amber-800 text-xs rounded flex items-center justify-between animate-fadeIn">
+              <span className="flex items-center gap-2">
+                <span className="font-bold">⚠️ Connection Notice:</span> {error}
+              </span>
+              <button 
+                onClick={() => window.location.reload()} 
+                className="underline text-xs font-semibold hover:text-amber-900 cursor-pointer"
+              >
+                Retry
+              </button>
+            </div>
+          )}
+
           {activeTab === 'dashboard' ? (
             selectedPhc ? (
               <PhcDetail 
                 phc={selectedPhc} 
+                medicines={medicines}
+                loading={loading}
                 onBack={() => setSelectedPhc(null)} 
               />
             ) : (
               <Dashboard 
-                phcs={mockPhcs} 
+                phcs={phcs} 
+                medicines={medicines}
+                transfers={transfers}
+                districts={districts}
+                diseaseReports={diseaseReports}
+                federatedModel={federatedModel}
+                loading={loading}
+                error={error}
                 onSelectPhc={setSelectedPhc} 
                 districtFilter={districtFilter}
               />
             )
           ) : activeTab === 'districts' ? (
-            <DistrictsSummary phcs={mockPhcs} onSelectDistrict={(d) => {
-              setDistrictFilter(d);
-              setActiveTab('dashboard');
-            }} />
+            <DistrictsSummary 
+              phcs={phcs} 
+              medicines={medicines}
+              districts={districts}
+              diseaseReports={diseaseReports}
+              federatedModel={federatedModel}
+              loading={loading}
+              onSelectDistrict={(d) => {
+                setDistrictFilter(d);
+                setActiveTab('dashboard');
+              }} 
+            />
           ) : activeTab === 'alerts' ? (
-            <AlertsList phcs={mockPhcs} onSelectPhc={(phc) => {
-              setSelectedPhc(phc);
-              setActiveTab('dashboard');
-            }} />
+            <AlertsList 
+              phcs={phcs} 
+              medicines={medicines}
+              alerts={alerts}
+              loading={loading}
+              onSelectPhc={(phc) => {
+                setSelectedPhc(phc);
+                setActiveTab('dashboard');
+              }} 
+            />
           ) : activeTab === 'federated' ? (
-            <FederatedIntelligence />
+            <FederatedIntelligence 
+              federatedModel={federatedModel}
+              loading={loading}
+            />
           ) : activeTab === 'brics' ? (
-            <BricsNetwork />
+            <BricsNetwork 
+              countries={countries}
+              loading={loading}
+            />
           ) : null}
         </main>
       </div>

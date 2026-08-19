@@ -1,14 +1,29 @@
 import React, { useState } from 'react';
 import { mockMedicines } from '../data/mockMedicines';
-import { predictDaysToStockOut } from '../lib/forecast';
+import { predictDaysToStockOut, calculateDistrictRisk } from '../lib/forecast';
 import { getRedistributionRecommendation } from '../lib/redistribution';
 
-export default function Dashboard({ phcs, onSelectPhc, districtFilter }) {
+export default function Dashboard({ 
+  phcs = [], 
+  medicines = [], 
+  transfers = [], 
+  districts = [], 
+  diseaseReports = [], 
+  federatedModel = null, 
+  loading = false, 
+  onSelectPhc, 
+  districtFilter 
+}) {
   const [dispatchedRecs, setDispatchedRecs] = useState({});
-  const districts = ['Namakkal', 'Salem', 'Erode'];
+
+  const districtList = districts && districts.length > 0
+    ? districts.map(d => d.name)
+    : Array.from(new Set(['Namakkal', 'Salem', 'Erode', ...phcs.map(p => p.district)]));
+
+  const activeMeds = medicines && medicines.length > 0 ? medicines : mockMedicines;
 
   const getStatus = (occupied, total, phcMeds) => {
-    const occupancyRate = occupied / total;
+    const occupancyRate = total > 0 ? occupied / total : 0;
     
     // Check if any medicine is near stockout (< 3 days)
     const stockoutTimes = phcMeds.map(m => predictDaysToStockOut(m.consumption_history, m.current_stock));
@@ -44,8 +59,21 @@ export default function Dashboard({ phcs, onSelectPhc, districtFilter }) {
     : phcs.filter(phc => phc.district === districtFilter);
 
   const activeDistricts = districtFilter === 'All'
-    ? districts
-    : districts.filter(d => d === districtFilter);
+    ? districtList
+    : districtList.filter(d => d === districtFilter);
+
+  // Loading state
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center p-16 text-[#64748B] text-xs font-semibold space-x-3 animate-fadeIn">
+        <svg className="w-5 h-5 animate-spin text-[#1D4E89]" fill="none" viewBox="0 0 24 24">
+          <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+          <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z"></path>
+        </svg>
+        <span>LOADING COMMAND CENTER DATA...</span>
+      </div>
+    );
+  }
 
   // 1. CALCULATE KPI METRICS DYNAMICALLY
   const totalPhcs = filteredPhcs.length;
@@ -59,7 +87,7 @@ export default function Dashboard({ phcs, onSelectPhc, districtFilter }) {
   let medicineShortages = 0;
 
   filteredPhcs.forEach((phc) => {
-    const phcMeds = mockMedicines.filter(m => m.phc_id === phc.id);
+    const phcMeds = activeMeds.filter(m => m.phc_id === phc.id);
     const status = getStatus(phc.occupied_beds, phc.total_beds, phcMeds);
     
     if (status.label === 'CRITICAL') criticalCount++;
@@ -83,17 +111,46 @@ export default function Dashboard({ phcs, onSelectPhc, districtFilter }) {
   // 2. SCAN FOR REDISTRIBUTION RECOMMENDATIONS
   const allRecommendations = [];
   filteredPhcs.forEach((phc) => {
-    const phcMeds = mockMedicines.filter(med => med.phc_id === phc.id);
+    const phcMeds = activeMeds.filter(med => med.phc_id === phc.id);
     phcMeds.forEach((med) => {
       const daysToStockOut = predictDaysToStockOut(med.consumption_history, med.current_stock);
       if (daysToStockOut < 7) {
-        const rec = getRedistributionRecommendation(phc, med.name, phcs, mockMedicines);
+        const rec = getRedistributionRecommendation(phc, med.name, phcs, activeMeds);
         if (rec) {
           allRecommendations.push(rec);
         }
       }
     });
   });
+
+  // Fallback to Firestore transfers if available and no recommendations generated
+  if (allRecommendations.length === 0 && transfers.length > 0) {
+    transfers.forEach((t) => {
+      const fromPhc = phcs.find(p => p.id === t.from_phc_id);
+      const toPhc = phcs.find(p => p.id === t.to_phc_id);
+      if (fromPhc && toPhc) {
+        allRecommendations.push({
+          from_phc: fromPhc,
+          to_phc: toPhc,
+          medicine: t.medicine_name || t.medicine_id,
+          quantity: t.quantity,
+          distance_km: t.distance_km
+        });
+      }
+    });
+  }
+
+  if (totalPhcs === 0) {
+    return (
+      <div className="bg-white border border-slate-200 rounded-lg p-12 text-center text-xs text-[#64748B] animate-fadeIn">
+        <svg className="w-8 h-8 text-slate-300 mx-auto mb-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
+        </svg>
+        <p className="font-semibold text-slate-700">No PHC Nodes Available</p>
+        <p className="mt-1 text-slate-500">There are currently no Primary Health Centres in the selected filter view.</p>
+      </div>
+    );
+  }
 
   return (
     <div className="grid grid-cols-1 xl:grid-cols-4 gap-6 items-start animate-fadeIn">
@@ -141,7 +198,7 @@ export default function Dashboard({ phcs, onSelectPhc, districtFilter }) {
                   AI Recommendation
                 </span>
               </div>
-              <p className="text-[11px] text-[#64748B] mt-0.5">AI-generated · Updated 2 min ago</p>
+              <p className="text-[11px] text-[#64748B] mt-0.5">AI-generated · Updated from Firestore</p>
             </div>
 
             <div className="divide-y divide-slate-100 border border-slate-100 rounded">
@@ -212,10 +269,10 @@ export default function Dashboard({ phcs, onSelectPhc, districtFilter }) {
                 {/* Grid */}
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                   {districtPhcs.map((phc) => {
-                    const phcMeds = mockMedicines.filter(m => m.phc_id === phc.id);
+                    const phcMeds = activeMeds.filter(m => m.phc_id === phc.id);
                     const status = getStatus(phc.occupied_beds, phc.total_beds, phcMeds);
-                    const occupancyRate = Math.round((phc.occupied_beds / phc.total_beds) * 100);
-                    const staffRate = Math.round((phc.staff_present_today / phc.total_staff) * 100);
+                    const occupancyRate = phc.total_beds > 0 ? Math.round((phc.occupied_beds / phc.total_beds) * 100) : 0;
+                    const staffRate = phc.total_staff > 0 ? Math.round((phc.staff_present_today / phc.total_staff) * 100) : 0;
                     
                     const isCritical = status.label === 'CRITICAL';
 
@@ -349,50 +406,29 @@ export default function Dashboard({ phcs, onSelectPhc, districtFilter }) {
           </div>
 
           <div className="space-y-4">
-            {/* Namakkal */}
-            <div className="space-y-1">
-              <div className="flex justify-between items-baseline text-xs">
-                <span className="font-heading font-semibold text-[#0F172A]">Namakkal Node</span>
-                <span className="font-mono text-xs font-bold text-[#D64545]">92% CRITICAL</span>
-              </div>
-              <div className="h-2 w-full bg-slate-100 rounded-full relative">
-                <div className="absolute inset-0 bg-gradient-to-r from-emerald-600 via-[#E8A33D] to-[#D64545] rounded-full opacity-20"></div>
-                <div 
-                  className="absolute top-1/2 -translate-y-1/2 h-3.5 w-1 bg-[#D64545] rounded"
-                  style={{ left: '92%' }}
-                ></div>
-              </div>
-            </div>
-
-            {/* Erode */}
-            <div className="space-y-1">
-              <div className="flex justify-between items-baseline text-xs">
-                <span className="font-heading font-semibold text-[#0F172A]">Erode Node</span>
-                <span className="font-mono text-xs font-bold text-[#0F6B66]">24% STABLE</span>
-              </div>
-              <div className="h-2 w-full bg-slate-100 rounded-full relative">
-                <div className="absolute inset-0 bg-gradient-to-r from-emerald-600 via-[#E8A33D] to-[#D64545] rounded-full opacity-20"></div>
-                <div 
-                  className="absolute top-1/2 -translate-y-1/2 h-3.5 w-1 bg-[#0F6B66] rounded"
-                  style={{ left: '24%' }}
-                ></div>
-              </div>
-            </div>
-
-            {/* Salem */}
-            <div className="space-y-1">
-              <div className="flex justify-between items-baseline text-xs">
-                <span className="font-heading font-semibold text-[#0F172A]">Salem Node</span>
-                <span className="font-mono text-xs font-bold text-[#0F6B66]">12% STABLE</span>
-              </div>
-              <div className="h-2 w-full bg-slate-100 rounded-full relative">
-                <div className="absolute inset-0 bg-gradient-to-r from-emerald-600 via-[#E8A33D] to-[#D64545] rounded-full opacity-20"></div>
-                <div 
-                  className="absolute top-1/2 -translate-y-1/2 h-3.5 w-1 bg-[#0F6B66] rounded"
-                  style={{ left: '12%' }}
-                ></div>
-              </div>
-            </div>
+            {districtList.map((dName) => {
+              const riskInfo = calculateDistrictRisk(dName, diseaseReports, phcs, activeMeds, federatedModel);
+              
+              return (
+                <div key={dName} className="space-y-1">
+                  <div className="flex justify-between items-baseline text-xs">
+                    <span className="font-heading font-semibold text-[#0F172A]">{dName} Node</span>
+                    <span className={`font-mono text-xs font-bold ${riskInfo.severity === 'CRITICAL' ? 'text-[#D64545]' : riskInfo.severity === 'HIGH' ? 'text-[#E8A33D]' : 'text-[#0F6B66]'}`}>
+                      {riskInfo.riskScore}% {riskInfo.severity}
+                    </span>
+                  </div>
+                  <div className="h-2 w-full bg-slate-100 rounded-full relative">
+                    <div className="absolute inset-0 bg-gradient-to-r from-emerald-600 via-[#E8A33D] to-[#D64545] rounded-full opacity-20"></div>
+                    <div 
+                      className={`absolute top-1/2 -translate-y-1/2 h-3.5 w-1 rounded ${
+                        riskInfo.severity === 'CRITICAL' ? 'bg-[#D64545]' : riskInfo.severity === 'HIGH' ? 'bg-[#E8A33D]' : 'bg-[#0F6B66]'
+                      }`}
+                      style={{ left: `${Math.min(96, Math.max(2, riskInfo.riskScore))}%` }}
+                    ></div>
+                  </div>
+                </div>
+              );
+            })}
           </div>
         </div>
 

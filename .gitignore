@@ -70,3 +70,7 @@ node_modules/
 
 .agents/
 skills-lock.json
+
+.env.local
+
+dist/

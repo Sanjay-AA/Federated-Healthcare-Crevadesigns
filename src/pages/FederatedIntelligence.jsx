@@ -1,6 +1,32 @@
 import React from 'react';
 
-export default function FederatedIntelligence() {
+export default function FederatedIntelligence({ federatedModel, loading = false }) {
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center p-16 text-[#64748B] text-xs font-semibold space-x-3 animate-fadeIn">
+        <svg className="w-5 h-5 animate-spin text-[#1D4E89]" fill="none" viewBox="0 0 24 24">
+          <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+          <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z"></path>
+        </svg>
+        <span>LOADING FEDERATED NETWORK MODEL PARAMETERS...</span>
+      </div>
+    );
+  }
+
+  // Extract model parameters from Firestore or use fallback
+  const salemSlope = federatedModel?.nodes?.Salem?.slope ?? 0.05;
+  const salemStatus = federatedModel?.nodes?.Salem?.status ?? 'STABLE';
+  
+  const namakkalSlope = federatedModel?.nodes?.Namakkal?.slope ?? 11.93;
+  const namakkalStatus = federatedModel?.nodes?.Namakkal?.status ?? 'OUTBREAK';
+  
+  const erodeSlope = federatedModel?.nodes?.Erode?.slope ?? -0.02;
+  const erodeStatus = federatedModel?.nodes?.Erode?.status ?? 'STABLE';
+
+  const aggregatorName = federatedModel?.aggregator ?? 'Tamil Nadu Central Aggregator';
+  const algorithmName = federatedModel?.algorithm ?? 'FedAvg';
+  const globalTrend = federatedModel?.global_trend ?? 3.42;
+
   return (
     <div className="space-y-6 animate-fadeIn">
       {/* CSS Animation Keyframes Injector */}
@@ -40,7 +66,7 @@ export default function FederatedIntelligence() {
           Federated AI Network Architecture
         </h1>
         <p className="text-xs text-[#64748B] mt-1">
-          Privacy-preserving collaborative machine learning for state-wide resource forecasting.
+          Privacy-preserving collaborative machine learning for state-wide resource forecasting from Firestore.
         </p>
       </div>
 
@@ -48,8 +74,13 @@ export default function FederatedIntelligence() {
         
         {/* Architecture Diagram and Animation Flow */}
         <div className="lg:col-span-2 bg-white border border-[#E2E8F0] rounded-lg p-6 space-y-12 relative overflow-hidden">
-          <div className="text-xs font-semibold text-[#1D4E89] uppercase tracking-wider">
-            Live Aggregation Data-Flow Simulation
+          <div className="flex items-center justify-between">
+            <div className="text-xs font-semibold text-[#1D4E89] uppercase tracking-wider">
+              Live Aggregation Data-Flow Simulation
+            </div>
+            <span className="text-[9px] font-mono text-[#64748B] bg-slate-50 px-2 py-0.5 rounded border border-slate-200">
+              GLOBAL TREND: +{globalTrend}
+            </span>
           </div>
 
           {/* District Nodes Layer */}
@@ -59,11 +90,13 @@ export default function FederatedIntelligence() {
             <div className="bg-[#F7F9FB] border border-[#E2E8F0] rounded p-4 space-y-3 relative">
               <div className="flex items-center justify-between">
                 <span className="text-[10px] font-bold text-[#64748B] uppercase tracking-wider">Node: Salem</span>
-                <span className="h-1.5 w-1.5 rounded-full bg-[#0F6B66] animate-pulse"></span>
+                <span className={`h-1.5 w-1.5 rounded-full ${salemStatus === 'OUTBREAK' ? 'bg-[#D64545]' : 'bg-[#0F6B66]'} animate-pulse`}></span>
               </div>
               <div className="space-y-1">
                 <div className="text-[11px] text-[#64748B] font-medium">Local Model State</div>
-                <div className="text-xs text-[#0F6B66] font-semibold font-mono">STABLE (slope = +0.05)</div>
+                <div className={`text-xs font-semibold font-mono ${salemStatus === 'OUTBREAK' ? 'text-[#D64545]' : 'text-[#0F6B66]'}`}>
+                  {salemStatus} (slope = {salemSlope >= 0 ? `+${salemSlope}` : salemSlope})
+                </div>
               </div>
               <div className="text-[9px] text-[#64748B] font-mono bg-white p-1.5 rounded border border-[#E2E8F0]/70">
                 P2P DATA: PROTECTED
@@ -73,7 +106,7 @@ export default function FederatedIntelligence() {
               <div className="absolute left-1/2 -bottom-12 transform -translate-x-1/2 flex flex-col items-center">
                 <div className="h-12 w-px bg-dashed border-l border-[#E2E8F0]"></div>
                 <div className="absolute top-1 bg-[#F0F5FA] border border-[#1D4E89]/20 text-[#1D4E89] text-[9px] font-mono px-1.5 py-0.5 rounded shadow-sm animate-flow-delay-0 z-20">
-                  {`{ slope: 0.05 }`}
+                  {`{ slope: ${salemSlope} }`}
                 </div>
               </div>
             </div>
@@ -82,11 +115,13 @@ export default function FederatedIntelligence() {
             <div className="bg-[#F7F9FB] border border-[#E2E8F0] rounded p-4 space-y-3 relative">
               <div className="flex items-center justify-between">
                 <span className="text-[10px] font-bold text-[#64748B] uppercase tracking-wider">Node: Namakkal</span>
-                <span className="h-1.5 w-1.5 rounded-full bg-[#D64545] animate-pulse"></span>
+                <span className={`h-1.5 w-1.5 rounded-full ${namakkalStatus === 'OUTBREAK' ? 'bg-[#D64545]' : 'bg-[#0F6B66]'} animate-pulse`}></span>
               </div>
               <div className="space-y-1">
                 <div className="text-[11px] text-[#64748B] font-medium">Local Model State</div>
-                <div className="text-xs text-[#D64545] font-semibold font-mono">OUTBREAK (slope = +11.93)</div>
+                <div className={`text-xs font-semibold font-mono ${namakkalStatus === 'OUTBREAK' ? 'text-[#D64545]' : 'text-[#0F6B66]'}`}>
+                  {namakkalStatus} (slope = {namakkalSlope >= 0 ? `+${namakkalSlope}` : namakkalSlope})
+                </div>
               </div>
               <div className="text-[9px] text-[#64748B] font-mono bg-white p-1.5 rounded border border-[#E2E8F0]/70">
                 P2P DATA: PROTECTED
@@ -96,7 +131,7 @@ export default function FederatedIntelligence() {
               <div className="absolute left-1/2 -bottom-12 transform -translate-x-1/2 flex flex-col items-center">
                 <div className="h-12 w-px bg-dashed border-l border-[#E2E8F0]"></div>
                 <div className="absolute top-1 bg-[#D64545]/10 border border-[#D64545]/20 text-[#D64545] text-[9px] font-mono px-1.5 py-0.5 rounded shadow-sm animate-flow-delay-1 z-20">
-                  {`{ slope: 11.93 }`}
+                  {`{ slope: ${namakkalSlope} }`}
                 </div>
               </div>
             </div>
@@ -105,11 +140,13 @@ export default function FederatedIntelligence() {
             <div className="bg-[#F7F9FB] border border-[#E2E8F0] rounded p-4 space-y-3 relative">
               <div className="flex items-center justify-between">
                 <span className="text-[10px] font-bold text-[#64748B] uppercase tracking-wider">Node: Erode</span>
-                <span className="h-1.5 w-1.5 rounded-full bg-[#0F6B66] animate-pulse"></span>
+                <span className={`h-1.5 w-1.5 rounded-full ${erodeStatus === 'OUTBREAK' ? 'bg-[#D64545]' : 'bg-[#0F6B66]'} animate-pulse`}></span>
               </div>
               <div className="space-y-1">
                 <div className="text-[11px] text-[#64748B] font-medium">Local Model State</div>
-                <div className="text-xs text-[#0F6B66] font-semibold font-mono">STABLE (slope = -0.02)</div>
+                <div className={`text-xs font-semibold font-mono ${erodeStatus === 'OUTBREAK' ? 'text-[#D64545]' : 'text-[#0F6B66]'}`}>
+                  {erodeStatus} (slope = {erodeSlope >= 0 ? `+${erodeSlope}` : erodeSlope})
+                </div>
               </div>
               <div className="text-[9px] text-[#64748B] font-mono bg-white p-1.5 rounded border border-[#E2E8F0]/70">
                 P2P DATA: PROTECTED
@@ -119,7 +156,7 @@ export default function FederatedIntelligence() {
               <div className="absolute left-1/2 -bottom-12 transform -translate-x-1/2 flex flex-col items-center">
                 <div className="h-12 w-px bg-dashed border-l border-[#E2E8F0]"></div>
                 <div className="absolute top-1 bg-[#F0F5FA] border border-[#1D4E89]/20 text-[#1D4E89] text-[9px] font-mono px-1.5 py-0.5 rounded shadow-sm animate-flow-delay-2 z-20">
-                  {`{ slope: -0.02 }`}
+                  {`{ slope: ${erodeSlope} }`}
                 </div>
               </div>
             </div>
@@ -138,10 +175,10 @@ export default function FederatedIntelligence() {
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2" />
                   </svg>
                 </div>
-                <span className="text-xs font-semibold text-[#1E293B] uppercase tracking-wider font-heading">Tamil Nadu Central Aggregator</span>
+                <span className="text-xs font-semibold text-[#1E293B] uppercase tracking-wider font-heading">{aggregatorName}</span>
               </div>
               <span className="text-[9px] font-bold text-[#1D4E89] bg-[#F0F5FA] border border-[#E2E8F0] px-2 py-0.5 rounded">
-                FedAvg Active
+                {algorithmName} Active
               </span>
             </div>
 
