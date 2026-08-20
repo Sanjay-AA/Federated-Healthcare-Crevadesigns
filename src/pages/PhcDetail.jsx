@@ -12,11 +12,28 @@ import {
 import { mockMedicines } from '../data/mockMedicines';
 import { predictDaysToStockOut } from '../lib/forecast';
 
-export default function PhcDetail({ phc, onBack }) {
-  const medicines = mockMedicines.filter(med => med.phc_id === phc.id);
+export default function PhcDetail({ phc, medicines = [], loading = false, onBack }) {
+  const activeMedsSource = medicines && medicines.length > 0 ? medicines : mockMedicines;
+  const phcMedicines = activeMedsSource.filter(med => med.phc_id === phc?.id);
 
-  const occupancyRate = Math.round((phc.occupied_beds / phc.total_beds) * 100);
-  const staffRate = Math.round((phc.staff_present_today / phc.total_staff) * 100);
+  if (!phc) return null;
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center p-16 text-[#64748B] text-xs font-semibold space-x-3 animate-fadeIn">
+        <svg className="w-5 h-5 animate-spin text-[#1D4E89]" fill="none" viewBox="0 0 24 24">
+          <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+          <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z"></path>
+        </svg>
+        <span>LOADING PHC DETAIL READOUT...</span>
+      </div>
+    );
+  }
+
+  const totalBeds = phc.total_beds || 1;
+  const totalStaff = phc.total_staff || 1;
+  const occupancyRate = Math.round(((phc.occupied_beds || 0) / totalBeds) * 100);
+  const staffRate = Math.round(((phc.staff_present_today || 0) / totalStaff) * 100);
 
   const getStockStatus = (stock, minRequired) => {
     if (stock <= 0) {
@@ -61,7 +78,7 @@ export default function PhcDetail({ phc, onBack }) {
           <div className="space-y-2 pt-3 border-t border-[#E2E8F0] text-xs">
             <div className="flex justify-between">
               <span className="text-[#64748B] font-medium uppercase tracking-wider text-[10px]">GPS Coordinates</span>
-              <span className="font-mono text-[#1E293B] font-medium">{phc.lat.toFixed(4)}, {phc.lng.toFixed(4)}</span>
+              <span className="font-mono text-[#1E293B] font-medium">{phc.lat ? phc.lat.toFixed(4) : 'N/A'}, {phc.lng ? phc.lng.toFixed(4) : 'N/A'}</span>
             </div>
             <div className="flex justify-between">
               <span className="text-[#64748B] font-medium uppercase tracking-wider text-[10px]">Regional Outpost</span>
@@ -145,128 +162,134 @@ export default function PhcDetail({ phc, onBack }) {
           </p>
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
-          {medicines.map((med) => {
-            const minRequired = med.name === 'Paracetamol' ? 300 : med.name === 'IV Fluids' ? 200 : 150;
-            const status = getStockStatus(med.current_stock, minRequired);
-            
-            const history = med.consumption_history || [];
-            const baselineDays = 7;
-            const baselineSum = history.slice(0, baselineDays).reduce((sum, d) => sum + d.quantity_used, 0);
-            const baselineAvg = baselineSum / Math.min(baselineDays, history.length) || 1;
-            const latestValue = history[history.length - 1]?.quantity_used || 0;
-            const spikeRatio = latestValue / baselineAvg;
-            const hasSpike = spikeRatio >= 2.0;
-            const percentIncrease = Math.round((spikeRatio - 1) * 100);
+        {phcMedicines.length === 0 ? (
+          <div className="bg-white border border-[#E2E8F0] rounded-lg p-8 text-center text-xs text-[#64748B]">
+            No medicine inventory records found for this Primary Health Centre.
+          </div>
+        ) : (
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
+            {phcMedicines.map((med) => {
+              const minRequired = med.minimum_stock || (med.name === 'Paracetamol' ? 300 : med.name === 'IV Fluids' ? 200 : 150);
+              const status = getStockStatus(med.current_stock, minRequired);
+              
+              const history = med.consumption_history || [];
+              const baselineDays = 7;
+              const baselineSum = history.slice(0, baselineDays).reduce((sum, d) => sum + (d.quantity_used || 0), 0);
+              const baselineAvg = baselineSum / Math.min(baselineDays, Math.max(1, history.length)) || 1;
+              const latestValue = history[history.length - 1]?.quantity_used || 0;
+              const spikeRatio = latestValue / baselineAvg;
+              const hasSpike = spikeRatio >= 2.0;
+              const percentIncrease = Math.round((spikeRatio - 1) * 100);
 
-            let spikeStartDate = null;
-            if (hasSpike) {
-              const spikePoint = history.find((d, idx) => idx >= 4 && d.quantity_used >= baselineAvg * 1.5);
-              if (spikePoint) {
-                spikeStartDate = spikePoint.date;
+              let spikeStartDate = null;
+              if (hasSpike) {
+                const spikePoint = history.find((d, idx) => idx >= 4 && d.quantity_used >= baselineAvg * 1.5);
+                if (spikePoint) {
+                  spikeStartDate = spikePoint.date;
+                }
               }
-            }
 
-            // Predict days until stock-out
-            const daysToStockOut = predictDaysToStockOut(history, med.current_stock);
+              // Predict days until stock-out
+              const daysToStockOut = predictDaysToStockOut(history, med.current_stock);
 
-            return (
-              <div 
-                key={med.id} 
-                className="bg-white border border-[#E2E8F0] rounded-lg p-5 flex flex-col justify-between space-y-4"
-              >
-                {/* Title Row */}
-                <div className="space-y-2">
-                  <div className="flex items-start justify-between gap-2">
-                    <h4 className="font-heading font-bold text-[#1E293B] text-base">{med.name}</h4>
-                    <span className={`text-[9px] font-bold px-2 py-0.5 rounded border shrink-0 ${status.color}`}>
-                      {status.label}
-                    </span>
+              return (
+                <div 
+                  key={med.id} 
+                  className="bg-white border border-[#E2E8F0] rounded-lg p-5 flex flex-col justify-between space-y-4"
+                >
+                  {/* Title Row */}
+                  <div className="space-y-2">
+                    <div className="flex items-start justify-between gap-2">
+                      <h4 className="font-heading font-bold text-[#1E293B] text-base">{med.name}</h4>
+                      <span className={`text-[9px] font-bold px-2 py-0.5 rounded border shrink-0 ${status.color}`}>
+                        {status.label}
+                      </span>
+                    </div>
+                    <div className="flex flex-wrap gap-2">
+                      <span className="text-[10px] font-medium text-[#64748B] bg-[#F7F9FB] px-2 py-0.5 rounded border border-[#E2E8F0]">
+                        STOCK: <span className="font-mono text-[#1E293B] font-semibold">{med.current_stock}</span> {med.unit ? med.unit.toUpperCase() : 'UNITS'}
+                      </span>
+                      {hasSpike && (
+                        <span className="text-[9px] font-bold text-[#D64545] bg-[#D64545]/10 border border-[#D64545]/20 px-2 py-0.5 rounded tracking-wide">
+                          ⚠️ SPIKE (+{percentIncrease}%)
+                        </span>
+                      )}
+                      {daysToStockOut < 3 ? (
+                        <span className="text-[9px] font-bold text-[#D64545] bg-[#D64545]/10 border border-[#D64545]/20 px-2 py-0.5 rounded tracking-wide animate-pulse uppercase">
+                          ⚠️ Stock-out predicted in {daysToStockOut} {daysToStockOut === 1 ? 'day' : 'days'}
+                        </span>
+                      ) : daysToStockOut < 7 ? (
+                        <span className="text-[9px] font-bold text-[#E8A33D] bg-[#E8A33D]/10 border border-[#E8A33D]/20 px-2 py-0.5 rounded tracking-wide uppercase">
+                          ⚠️ Stock-out predicted in {daysToStockOut} days
+                        </span>
+                      ) : null}
+                    </div>
                   </div>
-                  <div className="flex flex-wrap gap-2">
-                    <span className="text-[10px] font-medium text-[#64748B] bg-[#F7F9FB] px-2 py-0.5 rounded border border-[#E2E8F0]">
-                      STOCK: <span className="font-mono text-[#1E293B] font-semibold">{med.current_stock}</span> {med.unit.toUpperCase()}
-                    </span>
-                    {hasSpike && (
-                      <span className="text-[9px] font-bold text-[#D64545] bg-[#D64545]/10 border border-[#D64545]/20 px-2 py-0.5 rounded tracking-wide">
-                        ⚠️ SPIKE (+{percentIncrease}%)
-                      </span>
-                    )}
-                    {daysToStockOut < 3 ? (
-                      <span className="text-[9px] font-bold text-[#D64545] bg-[#D64545]/10 border border-[#D64545]/20 px-2 py-0.5 rounded tracking-wide animate-pulse uppercase">
-                        ⚠️ Stock-out predicted in {daysToStockOut} {daysToStockOut === 1 ? 'day' : 'days'}
-                      </span>
-                    ) : daysToStockOut < 7 ? (
-                      <span className="text-[9px] font-bold text-[#E8A33D] bg-[#E8A33D]/10 border border-[#E8A33D]/20 px-2 py-0.5 rounded tracking-wide uppercase">
-                        ⚠️ Stock-out predicted in {daysToStockOut} days
-                      </span>
-                    ) : null}
-                  </div>
-                </div>
 
-                {/* Line Chart */}
-                <div className="bg-[#F7F9FB] border border-[#E2E8F0] rounded p-3">
-                  <div className="text-[10px] text-[#64748B] font-semibold mb-2 uppercase tracking-wider">
-                    14-Day Demand Run-Rate
-                  </div>
-                  <div className="h-[180px] w-full">
-                    <ResponsiveContainer width="100%" height="100%">
-                      <LineChart 
-                        data={history} 
-                        margin={{ top: 5, right: 5, left: -25, bottom: 0 }}
-                      >
-                        <CartesianGrid strokeDasharray="3 3" stroke="#E2E8F0" opacity={0.6} />
-                        <XAxis 
-                          dataKey="date" 
-                          stroke="#64748B" 
-                          fontSize={9} 
-                          tickLine={false} 
-                        />
-                        <YAxis 
-                          stroke="#64748B" 
-                          fontSize={9} 
-                          tickLine={false} 
-                        />
-                        <Tooltip 
-                          contentStyle={{ 
-                            backgroundColor: '#FFFFFF', 
-                            borderColor: '#E2E8F0', 
-                            borderRadius: '4px',
-                            color: '#1E293B',
-                            fontSize: '11px',
-                            boxShadow: 'none'
-                          }} 
-                        />
-                        {hasSpike && spikeStartDate && (
-                          <ReferenceArea 
-                            x1={spikeStartDate} 
-                            x2={history[history.length - 1]?.date} 
-                            fill="#D64545" 
-                            fillOpacity={0.03}
+                  {/* Line Chart */}
+                  <div className="bg-[#F7F9FB] border border-[#E2E8F0] rounded p-3">
+                    <div className="text-[10px] text-[#64748B] font-semibold mb-2 uppercase tracking-wider">
+                      14-Day Demand Run-Rate
+                    </div>
+                    <div className="h-[180px] w-full">
+                      <ResponsiveContainer width="100%" height="100%">
+                        <LineChart 
+                          data={history} 
+                          margin={{ top: 5, right: 5, left: -25, bottom: 0 }}
+                        >
+                          <CartesianGrid strokeDasharray="3 3" stroke="#E2E8F0" opacity={0.6} />
+                          <XAxis 
+                            dataKey="date" 
+                            stroke="#64748B" 
+                            fontSize={9} 
+                            tickLine={false} 
                           />
-                        )}
-                        <Line 
-                          type="monotone" 
-                          dataKey="quantity_used" 
-                          stroke={hasSpike ? '#D64545' : '#1D4E89'} 
-                          strokeWidth={2}
-                          dot={{ r: 1.5, fill: hasSpike ? '#D64545' : '#1D4E89', strokeWidth: 0 }}
-                          activeDot={{ r: 3.5, strokeWidth: 0 }}
-                        />
-                      </LineChart>
-                    </ResponsiveContainer>
+                          <YAxis 
+                            stroke="#64748B" 
+                            fontSize={9} 
+                            tickLine={false} 
+                          />
+                          <Tooltip 
+                            contentStyle={{ 
+                              backgroundColor: '#FFFFFF', 
+                              borderColor: '#E2E8F0', 
+                              borderRadius: '4px',
+                              color: '#1E293B',
+                              fontSize: '11px',
+                              boxShadow: 'none'
+                            }} 
+                          />
+                          {hasSpike && spikeStartDate && (
+                            <ReferenceArea 
+                              x1={spikeStartDate} 
+                              x2={history[history.length - 1]?.date} 
+                              fill="#D64545" 
+                              fillOpacity={0.03}
+                            />
+                          )}
+                          <Line 
+                            type="monotone" 
+                            dataKey="quantity_used" 
+                            stroke={hasSpike ? '#D64545' : '#1D4E89'} 
+                            strokeWidth={2}
+                            dot={{ r: 1.5, fill: hasSpike ? '#D64545' : '#1D4E89', strokeWidth: 0 }}
+                            activeDot={{ r: 3.5, strokeWidth: 0 }}
+                          />
+                        </LineChart>
+                      </ResponsiveContainer>
+                    </div>
+                  </div>
+
+                  {/* Card Info Footer */}
+                  <div className="pt-3 border-t border-[#E2E8F0] flex items-center justify-between text-xs text-[#64748B]">
+                    <span>REQUIRED SAFETY:</span>
+                    <span className="font-semibold text-[#1E293B] font-mono">{minRequired} {med.unit ? med.unit.toUpperCase() : 'UNITS'}</span>
                   </div>
                 </div>
-
-                {/* Card Info Footer */}
-                <div className="pt-3 border-t border-[#E2E8F0] flex items-center justify-between text-xs text-[#64748B]">
-                  <span>REQUIRED SAFETY:</span>
-                  <span className="font-semibold text-[#1E293B] font-mono">{minRequired} {med.unit.toUpperCase()}</span>
-                </div>
-              </div>
-            );
-          })}
-        </div>
+              );
+            })}
+          </div>
+        )}
       </div>
     </div>
   );

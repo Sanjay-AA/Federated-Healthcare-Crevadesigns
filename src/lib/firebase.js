@@ -1,7 +1,7 @@
 import { initializeApp } from "firebase/app";
-import { getFirestore } from "firebase/firestore";
+import { getFirestore, connectFirestoreEmulator } from "firebase/firestore";
 
-// These placeholder variables can be populated in a local .env file
+// These variables can be populated in a local .env file
 const firebaseConfig = {
   apiKey: import.meta.env.VITE_FIREBASE_API_KEY || "placeholder-api-key",
   authDomain: import.meta.env.VITE_FIREBASE_AUTH_DOMAIN || "placeholder-auth-domain",
@@ -13,3 +13,9 @@ const firebaseConfig = {
 
 const app = initializeApp(firebaseConfig);
 export const db = getFirestore(app);
+
+// Connect to local Firestore Emulator during development
+if (import.meta.env.DEV && !globalThis._firestoreEmulatorConnected) {
+  connectFirestoreEmulator(db, "127.0.0.1", 8080);
+  globalThis._firestoreEmulatorConnected = true;
+}

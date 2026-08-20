@@ -1,21 +1,46 @@
 import React from 'react';
 import { mockMedicines } from '../data/mockMedicines';
-import { predictDaysToStockOut } from '../lib/forecast';
+import { predictDaysToStockOut, calculateDistrictRisk } from '../lib/forecast';
 
-export default function DistrictsSummary({ phcs, onSelectDistrict }) {
-  const districts = ['Namakkal', 'Salem', 'Erode'];
+export default function DistrictsSummary({ 
+  phcs = [], 
+  medicines = [], 
+  districts = [], 
+  diseaseReports = [], 
+  federatedModel = null, 
+  loading = false, 
+  onSelectDistrict 
+}) {
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center p-16 text-[#64748B] text-xs font-semibold space-x-3 animate-fadeIn">
+        <svg className="w-5 h-5 animate-spin text-[#1D4E89]" fill="none" viewBox="0 0 24 24">
+          <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+          <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z"></path>
+        </svg>
+        <span>LOADING DISTRICT NODE SUMMARIES...</span>
+      </div>
+    );
+  }
+
+  const activeMedsSource = medicines && medicines.length > 0 ? medicines : mockMedicines;
+  
+  // Extract district list from Firestore or fallback
+  const districtList = districts.length > 0
+    ? districts.map(d => d.name)
+    : Array.from(new Set(['Namakkal', 'Salem', 'Erode', ...phcs.map(p => p.district)]));
 
   const getDistrictMetrics = (districtName) => {
     const districtPhcs = phcs.filter(phc => phc.district === districtName);
-    const totalBeds = districtPhcs.reduce((sum, p) => sum + p.total_beds, 0);
-    const occupiedBeds = districtPhcs.reduce((sum, p) => sum + p.occupied_beds, 0);
-    const totalStaff = districtPhcs.reduce((sum, p) => sum + p.total_staff, 0);
-    const staffPresent = districtPhcs.reduce((sum, p) => sum + p.staff_present_today, 0);
+    const totalBeds = districtPhcs.reduce((sum, p) => sum + (p.total_beds || 0), 0);
+    const occupiedBeds = districtPhcs.reduce((sum, p) => sum + (p.occupied_beds || 0), 0);
+    const totalStaff = districtPhcs.reduce((sum, p) => sum + (p.total_staff || 0), 0);
+    const staffPresent = districtPhcs.reduce((sum, p) => sum + (p.staff_present_today || 0), 0);
     
     // Find count of at-risk medicines (stock-out < 7 days)
     let atRiskMedsCount = 0;
     districtPhcs.forEach((phc) => {
-      const phcMeds = mockMedicines.filter(m => m.phc_id === phc.id);
+      const phcMeds = activeMedsSource.filter(m => m.phc_id === phc.id);
       phcMeds.forEach((med) => {
         const days = predictDaysToStockOut(med.consumption_history, med.current_stock);
         if (days < 7) {
@@ -24,26 +49,15 @@ export default function DistrictsSummary({ phcs, onSelectDistrict }) {
       });
     });
 
-    const bedOccupancyRate = Math.round((occupiedBeds / totalBeds) * 100) || 0;
-    const staffAttendanceRate = Math.round((staffPresent / totalStaff) * 100) || 0;
+    const bedOccupancyRate = totalBeds > 0 ? Math.round((occupiedBeds / totalBeds) * 100) : 0;
+    const staffAttendanceRate = totalStaff > 0 ? Math.round((staffPresent / totalStaff) * 100) : 0;
 
-    let riskLevel = 'LOW';
-    let riskColor = 'text-[#0F6B66] bg-[#0F6B66]/10 border-[#0F6B66]/20';
-    let riskPercentage = 15;
-
-    if (districtName === 'Namakkal') {
-      riskLevel = 'CRITICAL';
-      riskColor = 'text-[#D64545] bg-[#D64545]/10 border-[#D64545]/20 animate-pulse';
-      riskPercentage = 92;
-    } else if (districtName === 'Erode') {
-      riskLevel = 'STABLE';
-      riskColor = 'text-[#0F6B66] bg-[#0F6B66]/10 border-[#0F6B66]/20';
-      riskPercentage = 24;
-    } else if (districtName === 'Salem') {
-      riskLevel = 'STABLE';
-      riskColor = 'text-[#0F6B66] bg-[#0F6B66]/10 border-[#0F6B66]/20';
-      riskPercentage = 12;
-    }
+    // Calculate dynamic district risk score
+    const riskInfo = calculateDistrictRisk(districtName, diseaseReports, phcs, activeMedsSource, federatedModel);
+    const riskLevel = riskInfo.severity;
+    const riskColor = riskInfo.riskColor;
+    const riskPercentage = riskInfo.riskScore;
+    const barBg = riskInfo.barBg;
 
     return {
       totalPhcs: districtPhcs.length,
@@ -56,25 +70,34 @@ export default function DistrictsSummary({ phcs, onSelectDistrict }) {
       atRiskMedsCount,
       riskLevel,
       riskColor,
-      riskPercentage
+      riskPercentage,
+      barBg
     };
   };
 
+  if (districtList.length === 0) {
+    return (
+      <div className="bg-white border border-[#E2E8F0] rounded-lg p-12 text-center text-xs text-[#64748B] animate-fadeIn">
+        No health districts found in Firestore database.
+      </div>
+    );
+  }
+
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 animate-fadeIn">
       {/* Header */}
       <div className="pb-5 border-b border-[#E2E8F0]">
         <h1 className="text-xl font-heading font-semibold text-[#1D4E89]">
           District Node Summaries
         </h1>
         <p className="text-xs text-[#64748B] mt-1">
-          Comparative overview of regional health district capacities and crisis assessments.
+          Comparative overview of regional health district capacities and crisis assessments from Firestore.
         </p>
       </div>
 
       {/* Grid */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-        {districts.map((dName) => {
+        {districtList.map((dName) => {
           const m = getDistrictMetrics(dName);
           return (
             <div 
@@ -102,9 +125,7 @@ export default function DistrictsSummary({ phcs, onSelectDistrict }) {
                   </div>
                   <div className="h-2 w-full bg-[#E2E8F0] rounded-full relative overflow-hidden">
                     <div 
-                      className={`h-full rounded-full ${
-                        dName === 'Namakkal' ? 'bg-[#D64545]' : 'bg-[#0F6B66]'
-                      }`}
+                      className={`h-full rounded-full ${m.barBg}`}
                       style={{ width: `${m.riskPercentage}%` }}
                     ></div>
                   </div>
