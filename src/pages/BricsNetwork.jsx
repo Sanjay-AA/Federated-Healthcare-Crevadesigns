@@ -1,4 +1,5 @@
 import React from 'react';
+import { useLanguage } from '../i18n/LanguageContext';
 
 const flagMap = {
   IN: '🇮🇳',
@@ -8,7 +9,17 @@ const flagMap = {
   ZA: '🇿🇦'
 };
 
+const languageMap = {
+  IN: 'Hindi/English',
+  BR: 'Portuguese',
+  RU: 'Russian',
+  CN: 'Mandarin Chinese',
+  ZA: 'English'
+};
+
 export default function BricsNetwork({ countries = [], loading = false }) {
+  const { t } = useLanguage();
+
   if (loading) {
     return (
       <div className="flex items-center justify-center p-16 text-[#64748B] text-xs font-semibold space-x-3 animate-fadeIn">
@@ -16,86 +27,92 @@ export default function BricsNetwork({ countries = [], loading = false }) {
           <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
           <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z"></path>
         </svg>
-        <span>LOADING BRICS FEDERATION NODES...</span>
+        <span>{t('brics.loading')}</span>
       </div>
     );
   }
 
-  // Fallback countries list if collection empty
-  const activeCountries = countries.length > 0
-    ? countries
-    : [
-        { code: 'IN', name: 'India', status: 'ACTIVE' },
-        { code: 'BR', name: 'Brazil', status: 'CONNECTED' },
-        { code: 'RU', name: 'Russia', status: 'CONNECTED' },
-        { code: 'CN', name: 'China', status: 'CONNECTED' },
-        { code: 'ZA', name: 'South Africa', status: 'CONNECTED' }
-      ];
+  const activeCountries = countries || [];
 
   return (
-    <div className="space-y-6 animate-fadeIn">
+    <div className="space-y-5 animate-fadeIn">
       {/* Header */}
-      <div className="pb-5 border-b border-[#E2E8F0]">
-        <h1 className="text-xl font-heading font-semibold text-[#1D4E89]">
-          BRICS Global Federation Network
+      <div className="pb-3 border-b border-[#E2E8F0]">
+        <h1 className="text-xl font-sans font-semibold text-[#0F172A]">
+          {t('brics.title')}
         </h1>
         <p className="text-xs text-[#64748B] mt-1">
-          International federated model parameters sharing for pandemic response and outbreak preparedness.
+          {t('brics.subtitle')}
         </p>
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 items-start">
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-5 items-start">
         
         {/* Main Content Info */}
-        <div className="lg:col-span-2 bg-white border border-[#E2E8F0] rounded-lg p-6 space-y-6">
-          <h3 className="font-heading font-bold text-[#1E293B] text-base">
-            Global Aggregate Model Nodes
-          </h3>
-          <p className="text-xs text-[#64748B] leading-relaxed">
-            Select an active national server node to view global parameter exchange rates. Currently, the India central aggregator is active and feeding local state parameters.
-          </p>
+        <div className="lg:col-span-2 bg-white border border-[#E2E8F0] rounded-[8px] p-4 space-y-4">
+          <div>
+            <h3 className="font-sans font-semibold text-[#0F172A] text-sm">
+              {t('brics.nodes.title')}
+            </h3>
+            <p className="text-xs text-[#64748B] mt-0.5">
+              {t('brics.nodes.subtitle')}
+            </p>
+          </div>
 
-          {/* Selector Grid */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
-            {activeCountries.map((c) => {
-              const flag = flagMap[c.code] || '🌐';
-              const isActive = c.code === 'IN' || c.status === 'ACTIVE';
+          {activeCountries.length === 0 ? (
+            <div className="p-6 border border-dashed border-slate-200 rounded-[6px] text-center text-xs text-[#64748B]">
+              {t('brics.nodes.noNodes')}
+            </div>
+          ) : (
+            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3">
+              {activeCountries.map((c) => {
+                const flag = flagMap[c.code] || '🌐';
+                const isActive = c.code === 'IN' || c.status === 'ACTIVE';
+                const primaryLang = languageMap[c.code] || (c.name === 'India' ? 'Hindi/English' : c.name === 'Brazil' ? 'Portuguese' : c.name === 'Russia' ? 'Russian' : c.name === 'China' ? 'Mandarin Chinese' : c.name === 'South Africa' ? 'English' : '');
 
-              return (
-                <div 
-                  key={c.code || c.id}
-                  className={`flex items-center gap-3 p-4 rounded select-none ${
-                    isActive 
-                      ? 'bg-[#F0F5FA] border border-[#1D4E89]/40 text-[#1E293B] cursor-pointer' 
-                      : 'bg-[#F7F9FB]/50 border border-[#E2E8F0] text-slate-400 opacity-75 cursor-not-allowed'
-                  }`}
-                >
-                  <span className="text-xl">{flag}</span>
-                  <div className="leading-tight">
-                    <div className="font-bold text-xs">{c.name}</div>
-                    <div className={`text-[9px] font-semibold mt-0.5 ${isActive ? 'text-[#0F6B66]' : 'text-slate-500'}`}>
-                      {isActive ? '● ACTIVE NODE' : 'COMING SOON'}
+                return (
+                  <div 
+                    key={c.code || c.id}
+                    className={`flex items-center gap-3 p-3 rounded-[6px] select-none border transition-colors ${
+                      isActive 
+                        ? 'bg-slate-50 border-slate-300 text-[#0F172A] cursor-pointer hover:bg-slate-100/70' 
+                        : 'bg-[#F8FAFC]/50 border-[#E2E8F0] text-slate-400 opacity-75 cursor-not-allowed'
+                    }`}
+                  >
+                    <span className="text-lg">{flag}</span>
+                    <div className="leading-tight flex-1">
+                      <div className="flex items-center justify-between">
+                        <span className="font-semibold text-xs text-[#0F172A]">{c.name}</span>
+                        {primaryLang && (
+                          <span className="text-[10px] text-[#64748B] font-medium font-sans">
+                            {primaryLang}
+                          </span>
+                        )}
+                      </div>
+                      <div className={`text-[8px] font-bold tracking-wide mt-1 uppercase ${isActive ? 'text-[#0F6B66]' : 'text-slate-500'}`}>
+                        {isActive ? t('brics.nodes.prototypeNode') : t('brics.nodes.futureVision')}
+                      </div>
                     </div>
                   </div>
-                </div>
-              );
-            })}
-          </div>
+                );
+              })}
+            </div>
+          )}
         </div>
 
         {/* Sidebar Info Card */}
-        <div className="bg-white border border-[#E2E8F0] rounded-lg p-5 space-y-4">
-          <h3 className="text-xs font-semibold text-[#1D4E89] uppercase tracking-wider">
-            Federated Scope & Policy
+        <div className="bg-white border border-[#E2E8F0] rounded-[8px] p-4 space-y-3">
+          <h3 className="text-xs font-semibold text-[#0F172A] uppercase tracking-wider">
+            {t('brics.policy.title')}
           </h3>
-          <p className="text-xs text-[#1E293B] leading-relaxed">
-            The same state-level federated aggregation pattern extends to a BRICS-level aggregator, allowing nations to share predictive intelligence for pandemic/outbreak preparedness without exposing raw health data across borders.
+          <p className="text-xs text-[#475569] leading-relaxed">
+            {t('brics.policy.desc')}
           </p>
-          <div className="p-3 bg-[#F0F5FA] rounded border border-[#E2E8F0] text-[11px] text-[#64748B] leading-normal space-y-2">
-            <div className="font-semibold text-xs text-[#1D4E89] uppercase tracking-wider">AGGREGATION RULES</div>
-            <p>1. Local patient records never leave national borders.</p>
-            <p>2. Aggregated trend slopes are merged via secure multi-party computation (SMPC).</p>
-            <p>3. Dynamic forecasting updates occur under official health ministries.</p>
+          <div className="p-2.5 bg-[#F8FAFC] rounded-[6px] border border-[#E2E8F0] text-[11px] text-[#64748B] leading-normal space-y-1.5">
+            <div className="font-semibold text-xs text-[#0F172A] uppercase tracking-wider">{t('brics.policy.rulesTitle')}</div>
+            <p>{t('brics.policy.rule1')}</p>
+            <p>{t('brics.policy.rule2')}</p>
+            <p>{t('brics.policy.rule3')}</p>
           </div>
         </div>
 

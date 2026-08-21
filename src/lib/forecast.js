@@ -1,18 +1,71 @@
 /**
+ * Calculates case growth rate (percentage increase in reported cases over the last 3-5 days).
+ *
+ * @param {Array<Object>} reportedCases Array of case reports { date, dengue_cases, malaria_cases }
+ * @param {string} [diseaseType] Optional disease filter ('dengue', 'malaria'). If omitted, total cases are used.
+ * @returns {number} Growth rate as a decimal (e.g. 0.22 for 22% increase).
+ */
+export function calculateCaseGrowthRate(reportedCases, diseaseType) {
+  if (!reportedCases || reportedCases.length < 6) {
+    return 0;
+  }
+
+  // Ensure chronological order
+  const sorted = [...reportedCases].sort((a, b) => {
+    return new Date(a.date) - new Date(b.date);
+  });
+
+  const n = sorted.length;
+  // Use a 3-day window to compare the latest 3 days vs the 3 days preceding them
+  const windowSize = 3;
+  const recentDays = sorted.slice(-windowSize);
+  const priorDays = sorted.slice(-2 * windowSize, -windowSize);
+
+  const getCases = (day) => {
+    if (diseaseType === 'dengue') {
+      return Number(day.dengue_cases || 0);
+    }
+    if (diseaseType === 'malaria') {
+      return Number(day.malaria_cases || 0);
+    }
+    return Number(day.dengue_cases || 0) + Number(day.malaria_cases || 0);
+  };
+
+  const recentSum = recentDays.reduce((sum, d) => sum + getCases(d), 0);
+  const priorSum = priorDays.reduce((sum, d) => sum + getCases(d), 0);
+
+  if (priorSum <= 0) {
+    return recentSum > 0 ? 1.0 : 0;
+  }
+
+  return (recentSum - priorSum) / priorSum;
+}
+
+/**
  * Predicts the number of days until a medicine's stock is depleted using
  * simple linear regression on the last 7 days of consumption history.
  * 
  * @param {Array<{date: string, quantity_used: number}>} consumptionHistory 14-day history
  * @param {number} currentStock Current inventory level
+ * @param {number} [caseGrowthRate] Optional case growth rate parameter (decimal, e.g. 0.22)
  * @returns {number} Predicted days until stock-out (rounded). Returns 999 if no stock-out is expected in the near future.
  */
-export function predictDaysToStockOut(consumptionHistory, currentStock) {
+export function predictDaysToStockOut(consumptionHistory, currentStock, caseGrowthRate) {
   if (!consumptionHistory || consumptionHistory.length === 0) {
     return 999;
   }
   
   if (currentStock <= 0) {
     return 0;
+  }
+
+  // Determine the case growth rate to use
+  let growthRate = 0;
+  if (caseGrowthRate !== undefined && caseGrowthRate !== null) {
+    growthRate = caseGrowthRate;
+  } else {
+    // Dynamically calculate from the history if case data is embedded
+    growthRate = calculateCaseGrowthRate(consumptionHistory);
   }
 
   // Use the last 7 days to capture the latest trend
@@ -22,7 +75,11 @@ export function predictDaysToStockOut(consumptionHistory, currentStock) {
   if (n < 2) {
     // Fallback if there is not enough history: use average of whatever is available
     const avg = consumptionHistory.reduce((sum, d) => sum + d.quantity_used, 0) / consumptionHistory.length;
-    return avg > 0 ? Math.round(currentStock / avg) : 999;
+    let boostedAvg = avg;
+    if (growthRate > 0.15) {
+      boostedAvg *= (1 + growthRate);
+    }
+    return boostedAvg > 0 ? Math.round(currentStock / boostedAvg) : 999;
   }
 
   // Simple Linear Regression: y = m * x + c
@@ -75,6 +132,11 @@ export function predictDaysToStockOut(consumptionHistory, currentStock) {
     const baselineFloor = Math.max(1, averageConsumption * 0.5);
     if (predictedConsumption < baselineFloor) {
       predictedConsumption = baselineFloor;
+    }
+
+    // Apply case growth boost if threshold is exceeded (e.g. 15%)
+    if (growthRate > 0.15) {
+      predictedConsumption *= (1 + growthRate);
     }
 
     remainingStock -= predictedConsumption;
@@ -195,4 +257,37 @@ export function calculateDistrictRisk(districtName, diseaseReports = [], phcs = 
     riskColor,
     barBg
   };
+}
+
+/**
+ * Calculates the consumption trend (linear regression slope) over the last 7 days.
+ * 
+ * @param {Array<Object>} consumptionHistory 14-day history
+ * @returns {number} Slope value.
+ */
+export function calculateConsumptionTrend(consumptionHistory) {
+  if (!consumptionHistory || consumptionHistory.length < 2) {
+    return 0;
+  }
+  const historySegment = consumptionHistory.slice(-7);
+  const n = historySegment.length;
+  let sumX = 0;
+  let sumY = 0;
+  let sumXX = 0;
+  let sumXY = 0;
+
+  for (let i = 0; i < n; i++) {
+    const x = i;
+    const y = historySegment[i].quantity_used;
+    sumX += x;
+    sumY += y;
+    sumXX += x * x;
+    sumXY += x * y;
+  }
+
+  const denominator = n * sumXX - sumX * sumX;
+  if (denominator !== 0) {
+    return (n * sumXY - sumX * sumY) / denominator;
+  }
+  return 0;
 }
