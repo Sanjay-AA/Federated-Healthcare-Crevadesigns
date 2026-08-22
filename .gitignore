@@ -81,3 +81,7 @@ dist/
 serviceAccountKey.json
 *.key.json
 firebase-key*.json
+
+# Python generated files
+__pycache__/
+*.pyc
