@@ -1,8 +1,11 @@
 import {
   collection,
   getDocs,
+  addDoc,
+  serverTimestamp,
   query,
   orderBy,
+
 } from "firebase/firestore";
 
 import { db } from "./firebase";
@@ -74,6 +77,14 @@ export async function getTransfers() {
   }));
 }
 
+export async function addTransfer(transferData) {
+  const docRef = await addDoc(collection(db, "transfers"), {
+    ...transferData,
+    created_at: serverTimestamp(),
+  });
+  return docRef.id;
+}
+
 export async function getFederatedModel() {
   const snapshot = await getDocs(
     collection(db, "federatedModels")
@@ -84,3 +95,4 @@ export async function getFederatedModel() {
     ...doc.data(),
   }));
 }
+

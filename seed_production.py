@@ -1,59 +1,44 @@
-import json
+#!/usr/bin/env python3
+r"""
+seed_production.py
+
+Production Database Seeding Script for Creva Health / Federated Healthcare.
+Target Project: federated-healthcare-3fcd3 (Production)
+
+Usage:
+  1. Set environment variable:
+     Windows PowerShell: $env:GOOGLE_APPLICATION_CREDENTIALS="C:\path\to\service-account.json"
+     Windows CMD: set GOOGLE_APPLICATION_CREDENTIALS=C:\path\to\service-account.json
+     Linux/macOS: export GOOGLE_APPLICATION_CREDENTIALS="/path/to/service-account.json"
+
+  2. Dry Run (Preview without writing):
+     python seed_production.py --dry-run
+
+  3. Seed Production:
+     python seed_production.py
+"""
+
+import os
+import sys
+import argparse
 import random
 from datetime import date, timedelta
-from urllib.request import Request, urlopen
-from urllib.error import HTTPError, URLError
 
-PROJECT_ID = "demo-federated-healthcare"
-BASE_URL = f"http://127.0.0.1:8080/v1/projects/{PROJECT_ID}/databases/(default)/documents"
-
-# Helper functions for Firestore REST values
-def stringValue(value):
-    return {"stringValue": str(value)}
-
-def integerValue(value):
-    return {"integerValue": str(value)}
-
-def doubleValue(value):
-    return {"doubleValue": float(value)}
-
-def booleanValue(value):
-    return {"booleanValue": bool(value)}
-
-def arrayValue(values):
-    return {"arrayValue": {"values": values}}
-
-def mapValue(fields):
-    return {"mapValue": {"fields": fields}}
-
-def write_doc(collection, doc_id, data):
-    url = f"{BASE_URL}/{collection}/{doc_id}"
-    payload = json.dumps({"fields": data}).encode("utf-8")
-    request = Request(
-        url,
-        data=payload,
-        method="PATCH",
-        headers={"Content-Type": "application/json"},
-    )
-    try:
-        with urlopen(request, timeout=10) as response:
-            status = response.status
-            print(f"WRITE {collection}/{doc_id}: HTTP {status}")
-            return status
-    except HTTPError as e:
-        status = e.code
-        body = e.read().decode("utf-8", errors="ignore")
-        print(f"ERROR {collection}/{doc_id}: HTTP {status}")
-        print(f"Response Body: {body}")
-        raise
-    except URLError as e:
-        print("Could not connect to Firestore Emulator.")
-        print("Make sure `firebase emulators:start --project=demo-federated-healthcare` is running.")
-        raise
+PROJECT_ID = "federated-healthcare-3fcd3"
+EXPECTED_COUNTS = {
+    "countries": 5,
+    "districts": 9,
+    "phcs": 19,
+    "medicines": 43,
+    "diseaseReports": 63,
+    "alerts": 9,
+    "transfers": 4,
+    "federatedModels": 1,
+}
 
 def make_reported_cases(phc_id, district, start_date_str="2026-08-06"):
     start = date.fromisoformat(start_date_str)
-    cases_values = []
+    cases_list = []
     for i in range(14):
         day = start + timedelta(days=i)
         if district in ["Namakkal", "Thrissur", "Pune"]:
@@ -67,17 +52,17 @@ def make_reported_cases(phc_id, district, start_date_str="2026-08-06"):
             dengue = 1
             malaria = 0
             
-        cases_values.append(mapValue({
-            "phc_id": stringValue(phc_id),
-            "date": stringValue(day.strftime("%Y-%m-%d")),
-            "dengue_cases": integerValue(dengue),
-            "malaria_cases": integerValue(malaria)
-        }))
-    return arrayValue(cases_values)
+        cases_list.append({
+            "phc_id": str(phc_id),
+            "date": day.strftime("%Y-%m-%d"),
+            "dengue_cases": int(dengue),
+            "malaria_cases": int(malaria)
+        })
+    return cases_list
 
 def make_history(base_usage, district, start_date_str="2026-08-06"):
     start = date.fromisoformat(start_date_str)
-    history_values = []
+    history_list = []
     for i, qty in enumerate(base_usage):
         day = start + timedelta(days=i)
         if district in ["Namakkal", "Thrissur", "Pune"]:
@@ -90,67 +75,44 @@ def make_history(base_usage, district, start_date_str="2026-08-06"):
         else:
             dengue = 1
             malaria = 0
-        history_values.append(mapValue({
-            "date": stringValue(day.strftime("%b %d")),
-            "quantity_used": integerValue(qty),
-            "dengue_cases": integerValue(dengue),
-            "malaria_cases": integerValue(malaria)
-        }))
-    return arrayValue(history_values)
+        history_list.append({
+            "date": day.strftime("%b %d"),
+            "quantity_used": int(qty),
+            "dengue_cases": int(dengue),
+            "malaria_cases": int(malaria)
+        })
+    return history_list
 
-def verify_collection(collection):
-    url = f"{BASE_URL}/{collection}"
-    request = Request(url, method="GET")
-    try:
-        with urlopen(request, timeout=10) as response:
-            res_data = json.loads(response.read().decode("utf-8"))
-            docs = res_data.get("documents", [])
-            return len(docs)
-    except Exception as e:
-        print(f"Verification query failed for {collection}: {e}")
-        return 0
-
-def seed():
+def build_seed_payloads():
     random.seed(42)
+    payloads = {}
 
     # 1. Countries
-    countries_data = [
-        ("IN", "India", "Asia", "ACTIVE"),
-        ("BR", "Brazil", "Americas", "CONNECTED"),
-        ("RU", "Russia", "Europe", "CONNECTED"),
-        ("CN", "China", "Asia", "CONNECTED"),
-        ("ZA", "South Africa", "Africa", "CONNECTED")
+    countries = [
+        ("IN", {"code": "IN", "name": "India", "region": "Asia", "status": "ACTIVE"}),
+        ("BR", {"code": "BR", "name": "Brazil", "region": "Americas", "status": "CONNECTED"}),
+        ("RU", {"code": "RU", "name": "Russia", "region": "Europe", "status": "CONNECTED"}),
+        ("CN", {"code": "CN", "name": "China", "region": "Asia", "status": "CONNECTED"}),
+        ("ZA", {"code": "ZA", "name": "South Africa", "region": "Africa", "status": "CONNECTED"}),
     ]
-    for code, name, region, status in countries_data:
-        write_doc("countries", code, {
-            "code": stringValue(code),
-            "name": stringValue(name),
-            "region": stringValue(region),
-            "status": stringValue(status)
-        })
+    payloads["countries"] = countries
 
     # 2. Districts
-    districts_data = [
-        ("salem", "Salem", "Tamil Nadu", "IN", "TN-SLM"),
-        ("erode", "Erode", "Tamil Nadu", "IN", "TN-ERD"),
-        ("namakkal", "Namakkal", "Tamil Nadu", "IN", "TN-NAM"),
-        ("ernakulam", "Ernakulam", "Kerala", "IN", "KL-EKM"),
-        ("thrissur", "Thrissur", "Kerala", "IN", "KL-TCR"),
-        ("kozhikode", "Kozhikode", "Kerala", "IN", "KL-KKD"),
-        ("mumbai_suburban", "Mumbai Suburban", "Maharashtra", "IN", "MH-MUB"),
-        ("pune", "Pune", "Maharashtra", "IN", "MH-PUN"),
-        ("nagpur", "Nagpur", "Maharashtra", "IN", "MH-NGP")
+    districts = [
+        ("salem", {"name": "Salem", "state": "Tamil Nadu", "country_code": "IN", "node_code": "TN-SLM"}),
+        ("erode", {"name": "Erode", "state": "Tamil Nadu", "country_code": "IN", "node_code": "TN-ERD"}),
+        ("namakkal", {"name": "Namakkal", "state": "Tamil Nadu", "country_code": "IN", "node_code": "TN-NAM"}),
+        ("ernakulam", {"name": "Ernakulam", "state": "Kerala", "country_code": "IN", "node_code": "KL-EKM"}),
+        ("thrissur", {"name": "Thrissur", "state": "Kerala", "country_code": "IN", "node_code": "KL-TCR"}),
+        ("kozhikode", {"name": "Kozhikode", "state": "Kerala", "country_code": "IN", "node_code": "KL-KKD"}),
+        ("mumbai_suburban", {"name": "Mumbai Suburban", "state": "Maharashtra", "country_code": "IN", "node_code": "MH-MUB"}),
+        ("pune", {"name": "Pune", "state": "Maharashtra", "country_code": "IN", "node_code": "MH-PUN"}),
+        ("nagpur", {"name": "Nagpur", "state": "Maharashtra", "country_code": "IN", "node_code": "MH-NGP"}),
     ]
-    for doc_id, name, state, country_code, node_code in districts_data:
-        write_doc("districts", doc_id, {
-            "name": stringValue(name),
-            "state": stringValue(state),
-            "country_code": stringValue(country_code),
-            "node_code": stringValue(node_code)
-        })
+    payloads["districts"] = districts
 
     # 3. PHCs
-    phcs_data = [
+    phcs_raw = [
         # Tamil Nadu PHCs
         {"id": "phc-slm-1", "name": "Salem Rural PHC", "district": "Salem", "state": "Tamil Nadu", "total_beds": 20, "occupied_beds": 8, "total_staff": 15, "staff_present_today": 14, "lat": 11.6643, "lng": 78.1460},
         {"id": "phc-erd-1", "name": "Erode Central PHC", "district": "Erode", "state": "Tamil Nadu", "total_beds": 25, "occupied_beds": 12, "total_staff": 18, "staff_present_today": 16, "lat": 11.3410, "lng": 77.7172},
@@ -172,26 +134,29 @@ def seed():
         {"id": "phc-pun-3", "name": "Kothrud Urban PHC", "district": "Pune", "state": "Maharashtra", "total_beds": 15, "occupied_beds": 6, "total_staff": 10, "staff_present_today": 9, "lat": 18.5074, "lng": 73.8077},
         {"id": "phc-ngp-1", "name": "Nagpur Central PHC", "district": "Nagpur", "state": "Maharashtra", "total_beds": 25, "occupied_beds": 11, "total_staff": 18, "staff_present_today": 16, "lat": 21.1458, "lng": 79.0882},
         {"id": "phc-ngp-2", "name": "Kamptee Community PHC", "district": "Nagpur", "state": "Maharashtra", "total_beds": 20, "occupied_beds": 7, "total_staff": 12, "staff_present_today": 11, "lat": 21.2234, "lng": 79.1989},
-        {"id": "phc-ngp-3", "name": "Hingna Rural PHC", "district": "Nagpur", "state": "Maharashtra", "total_beds": 15, "occupied_beds": 5, "total_staff": 10, "staff_present_today": 9, "lat": 21.0667, "lng": 78.9667}
+        {"id": "phc-ngp-3", "name": "Hingna Rural PHC", "district": "Nagpur", "state": "Maharashtra", "total_beds": 15, "occupied_beds": 5, "total_staff": 10, "staff_present_today": 9, "lat": 21.0667, "lng": 78.9667},
     ]
-    for p in phcs_data:
-        write_doc("phcs", p["id"], {
-            "name": stringValue(p["name"]),
-            "district": stringValue(p["district"]),
-            "state": stringValue(p["state"]),
-            "total_beds": integerValue(p["total_beds"]),
-            "occupied_beds": integerValue(p["occupied_beds"]),
-            "total_staff": integerValue(p["total_staff"]),
-            "staff_present_today": integerValue(p["staff_present_today"]),
-            "country_code": stringValue("IN"),
-            "lat": doubleValue(p["lat"]),
-            "lng": doubleValue(p["lng"]),
-            "status": stringValue("ACTIVE"),
+    phcs = []
+    for p in phcs_raw:
+        doc = {
+            "name": p["name"],
+            "district": p["district"],
+            "state": p["state"],
+            "total_beds": int(p["total_beds"]),
+            "occupied_beds": int(p["occupied_beds"]),
+            "total_staff": int(p["total_staff"]),
+            "staff_present_today": int(p["staff_present_today"]),
+            "country_code": "IN",
+            "lat": float(p["lat"]),
+            "lng": float(p["lng"]),
+            "status": "ACTIVE",
             "reported_cases": make_reported_cases(p["id"], p["district"])
-        })
+        }
+        phcs.append((p["id"], doc))
+    payloads["phcs"] = phcs
 
     # 4. Medicines
-    medicines_data = [
+    medicines_raw = [
         # Salem Rural PHC
         {"medicine_id": "med-slm1-paracetamol", "medicine_name": "Paracetamol", "phc_id": "phc-slm-1", "unit": "Tablets", "current_stock": 850, "reorder_level": 100, "daily_consumption": 16, "predicted_days_remaining": 53, "status": "HEALTHY", "history": [15,18,14,16,15,17,18,16,15,16,17,15,16,18]},
         {"medicine_id": "med-slm1-iv", "medicine_name": "IV Fluids", "phc_id": "phc-slm-1", "unit": "Bottles", "current_stock": 520, "reorder_level": 50, "daily_consumption": 4, "predicted_days_remaining": 130, "status": "HEALTHY", "history": [3,4,2,3,4,3,5,4,3,4,4,3,5,4]},
@@ -232,7 +197,7 @@ def seed():
         {"medicine_id": "med-pun1-paracetamol", "medicine_name": "Paracetamol", "phc_id": "phc-pun-1", "unit": "Tablets", "current_stock": 40, "reorder_level": 200, "daily_consumption": 140, "predicted_days_remaining": 0, "status": "CRITICAL", "history": [10,14,12,15,36,48,62,75,88,95,110,118,130,140]},
         {"medicine_id": "med-pun1-iv", "medicine_name": "IV Fluids", "phc_id": "phc-pun-1", "unit": "Bottles", "current_stock": 10, "reorder_level": 100, "daily_consumption": 45, "predicted_days_remaining": 0, "status": "CRITICAL", "history": [2,3,2,3,9,13,19,23,28,32,36,40,45,50]},
         {"medicine_id": "med-pun1-ors", "medicine_name": "ORS", "phc_id": "phc-pun-1", "unit": "Sachets", "current_stock": 160, "reorder_level": 100, "daily_consumption": 30, "predicted_days_remaining": 5, "status": "LOW_STOCK", "history": [4,7,5,6,9,11,14,17,19,21,24,27,29,30]},
-        # Hadapsar Community PHC
+        # Hadapsar Community PHC (Surplus Donor)
         {"medicine_id": "med-pun2-paracetamol", "medicine_name": "Paracetamol", "phc_id": "phc-pun-2", "unit": "Tablets", "current_stock": 850, "reorder_level": 200, "daily_consumption": 18, "predicted_days_remaining": 47, "status": "HEALTHY", "history": [15,17,16,18,17,19,18,17,18,19,18,17,18,18]},
         {"medicine_id": "med-pun2-iv", "medicine_name": "IV Fluids", "phc_id": "phc-pun-2", "unit": "Bottles", "current_stock": 550, "reorder_level": 50, "daily_consumption": 5, "predicted_days_remaining": 110, "status": "HEALTHY", "history": [3,4,3,4,5,4,3,4,5,4,3,4,4,5]},
         {"medicine_id": "med-pun2-amoxicillin", "medicine_name": "Amoxicillin", "phc_id": "phc-pun-2", "unit": "Capsules", "current_stock": 620, "reorder_level": 100, "daily_consumption": 10, "predicted_days_remaining": 62, "status": "HEALTHY", "history": [8,9,8,10,9,8,9,10,9,8,9,10,8,10]},
@@ -254,9 +219,10 @@ def seed():
         # Kamptee Community PHC
         {"medicine_id": "med-ngp2-ibuprofen", "medicine_name": "Ibuprofen", "phc_id": "phc-ngp-2", "unit": "Tablets", "current_stock": 12, "reorder_level": 50, "daily_consumption": 15, "predicted_days_remaining": 0, "status": "CRITICAL", "history": [6,7,5,7,6,8,7,6,7,8,7,6,8,15]},
         # Hingna Rural PHC
-        {"medicine_id": "med-ngp3-ors", "medicine_name": "ORS", "phc_id": "phc-ngp-3", "unit": "Sachets", "current_stock": 300, "reorder_level": 50, "daily_consumption": 7, "predicted_days_remaining": 42, "status": "HEALTHY", "history": [6,7,5,6,8,7,6,8,7,6,7,8,6,7]}
+        {"medicine_id": "med-ngp3-ors", "medicine_name": "ORS", "phc_id": "phc-ngp-3", "unit": "Sachets", "current_stock": 300, "reorder_level": 50, "daily_consumption": 7, "predicted_days_remaining": 42, "status": "HEALTHY", "history": [6,7,5,6,8,7,6,8,7,6,7,8,6,7]},
     ]
-    for m in medicines_data:
+    medicines = []
+    for m in medicines_raw:
         phc_id = m["phc_id"]
         if "nmk" in phc_id:
             district, state = "Namakkal", "Tamil Nadu"
@@ -279,21 +245,23 @@ def seed():
         else:
             district, state = "Erode", "Tamil Nadu"
 
-        write_doc("medicines", m["medicine_id"], {
-            "medicine_id": stringValue(m["medicine_id"]),
-            "medicine_name": stringValue(m["medicine_name"]),
-            "name": stringValue(m["medicine_name"]),
-            "phc_id": stringValue(m["phc_id"]),
-            "district": stringValue(district),
-            "state": stringValue(state),
-            "unit": stringValue(m["unit"]),
-            "current_stock": integerValue(m["current_stock"]),
-            "reorder_level": integerValue(m["reorder_level"]),
-            "daily_consumption": integerValue(m["daily_consumption"]),
-            "predicted_days_remaining": integerValue(m["predicted_days_remaining"]),
-            "status": stringValue(m["status"]),
+        doc = {
+            "medicine_id": m["medicine_id"],
+            "medicine_name": m["medicine_name"],
+            "name": m["medicine_name"],
+            "phc_id": m["phc_id"],
+            "district": district,
+            "state": state,
+            "unit": m["unit"],
+            "current_stock": int(m["current_stock"]),
+            "reorder_level": int(m["reorder_level"]),
+            "daily_consumption": int(m["daily_consumption"]),
+            "predicted_days_remaining": int(m["predicted_days_remaining"]),
+            "status": m["status"],
             "consumption_history": make_history(m["history"], district)
-        })
+        }
+        medicines.append((m["medicine_id"], doc))
+    payloads["medicines"] = medicines
 
     # 5. Disease Reports
     districts_geo = {
@@ -310,7 +278,7 @@ def seed():
     diseases = ["Dengue", "Malaria", "Typhoid", "Influenza", "Acute Respiratory Infection"]
     report_id = 1
     start_report_date = date(2026, 8, 13)
-
+    reports = []
     for dist_name, (lat, lng, base_cases, state_name) in districts_geo.items():
         for day_offset in range(7):
             current_date = start_report_date + timedelta(days=day_offset)
@@ -324,18 +292,20 @@ def seed():
                 severity = "LOW"
             
             disease = diseases[day_offset % len(diseases)]
-            write_doc("diseaseReports", f"report-{report_id:03d}", {
-                "district": stringValue(dist_name),
-                "state": stringValue(state_name),
-                "disease": stringValue(disease),
-                "reported_cases": integerValue(cases),
-                "date": stringValue(current_date.strftime("%Y-%m-%d")),
-                "severity": stringValue(severity),
-                "trend": stringValue(trend),
-                "latitude": doubleValue(lat),
-                "longitude": doubleValue(lng)
-            })
+            doc = {
+                "district": dist_name,
+                "state": state_name,
+                "disease": disease,
+                "reported_cases": int(cases),
+                "date": current_date.strftime("%Y-%m-%d"),
+                "severity": severity,
+                "trend": trend,
+                "latitude": float(lat),
+                "longitude": float(lng)
+            }
+            reports.append((f"report-{report_id:03d}", doc))
             report_id += 1
+    payloads["diseaseReports"] = reports
 
     # 6. Alerts
     alerts = [
@@ -466,24 +436,10 @@ def seed():
             "days_to_stockout": 0
         })
     ]
-    for doc_id, a in alerts:
-        write_doc("alerts", doc_id, {
-            "type": stringValue(a["type"]),
-            "title": stringValue(a["title"]),
-            "message": stringValue(a["message"]),
-            "severity": stringValue(a["severity"]),
-            "district": stringValue(a["district"]),
-            "state": stringValue(a["state"]),
-            "status": stringValue(a["status"]),
-            "created_at": stringValue(a["created_at"]),
-            "phc_id": stringValue(a["phc_id"]),
-            "medicine_id": stringValue(a["medicine_id"]),
-            "medicine_name": stringValue(a["medicine_name"]),
-            "days_to_stockout": integerValue(a["days_to_stockout"])
-        })
+    payloads["alerts"] = alerts
 
     # 7. Transfers
-    transfers_data = [
+    transfers = [
         ("transfer-001", {
             "from_phc_id": "phc-slm-1",
             "to_phc_id": "phc-nmk-1",
@@ -525,103 +481,141 @@ def seed():
             "state": "Maharashtra"
         })
     ]
-    for doc_id, t in transfers_data:
-        write_doc("transfers", doc_id, {
-            "from_phc_id": stringValue(t["from_phc_id"]),
-            "to_phc_id": stringValue(t["to_phc_id"]),
-            "medicine_id": stringValue(t["medicine_id"]),
-            "medicine_name": stringValue(t["medicine_name"]),
-            "quantity": integerValue(t["quantity"]),
-            "distance_km": doubleValue(t["distance_km"]),
-            "status": stringValue(t["status"]),
-            "state": stringValue(t["state"])
-        })
+    payloads["transfers"] = transfers
 
     # 8. Federated Models
     nodes = {
-        "Salem": mapValue({
-            "slope": doubleValue(0.05),
-            "status": stringValue("STABLE")
-        }),
-        "Namakkal": mapValue({
-            "slope": doubleValue(11.93),
-            "status": stringValue("OUTBREAK")
-        }),
-        "Erode": mapValue({
-            "slope": doubleValue(-0.02),
-            "status": stringValue("STABLE")
-        }),
-        "Ernakulam": mapValue({
-            "slope": doubleValue(0.08),
-            "status": stringValue("STABLE")
-        }),
-        "Thrissur": mapValue({
-            "slope": doubleValue(12.45),
-            "status": stringValue("OUTBREAK")
-        }),
-        "Kozhikode": mapValue({
-            "slope": doubleValue(-0.04),
-            "status": stringValue("STABLE")
-        }),
-        "Mumbai Suburban": mapValue({
-            "slope": doubleValue(0.06),
-            "status": stringValue("STABLE")
-        }),
-        "Pune": mapValue({
-            "slope": doubleValue(13.10),
-            "status": stringValue("OUTBREAK")
-        }),
-        "Nagpur": mapValue({
-            "slope": doubleValue(-0.03),
-            "status": stringValue("STABLE")
-        })
+        "Salem": {"slope": 0.05, "status": "STABLE"},
+        "Namakkal": {"slope": 11.93, "status": "OUTBREAK"},
+        "Erode": {"slope": -0.02, "status": "STABLE"},
+        "Ernakulam": {"slope": 0.08, "status": "STABLE"},
+        "Thrissur": {"slope": 12.45, "status": "OUTBREAK"},
+        "Kozhikode": {"slope": -0.04, "status": "STABLE"},
+        "Mumbai Suburban": {"slope": 0.06, "status": "STABLE"},
+        "Pune": {"slope": 13.10, "status": "OUTBREAK"},
+        "Nagpur": {"slope": -0.03, "status": "STABLE"}
     }
-    write_doc("federatedModels", "current", {
-        "algorithm": stringValue("FedAvg"),
-        "status": stringValue("ACTIVE"),
-        "aggregator": stringValue("India Central Aggregator"),
-        "global_trend": doubleValue(4.81),
-        "outbreak_risk": booleanValue(True),
-        "nodes": mapValue({
-            "Salem": nodes["Salem"],
-            "Namakkal": nodes["Namakkal"],
-            "Erode": nodes["Erode"],
-            "Ernakulam": nodes["Ernakulam"],
-            "Thrissur": nodes["Thrissur"],
-            "Kozhikode": nodes["Kozhikode"],
-            "Mumbai Suburban": nodes["Mumbai Suburban"],
-            "Pune": nodes["Pune"],
-            "Nagpur": nodes["Nagpur"]
+    federated_models = [
+        ("current", {
+            "algorithm": "FedAvg",
+            "status": "ACTIVE",
+            "aggregator": "India Central Aggregator",
+            "global_trend": 4.81,
+            "outbreak_risk": True,
+            "nodes": nodes
         })
-    })
+    ]
+    payloads["federatedModels"] = federated_models
 
-    print("\nSeed complete.\n")
-    print("Created/updated:")
-    print("  countries: 5")
-    print("  districts: 9")
-    print("  phcs: 19")
-    print("  medicines: 43")
-    print("  diseaseReports: 63")
-    print("  alerts: 9")
-    print("  transfers: 4")
-    print("  federatedModels: 1\n")
-    print("Open:")
-    print("http://127.0.0.1:4000/\n")
-    print("Then open:")
-    print("Firestore -> Data\n")
+    return payloads
 
-    # Verification
-    print("Verification:")
-    c_count = verify_collection("countries")
-    p_count = verify_collection("phcs")
-    f_count = verify_collection("federatedModels")
-    print(f"  countries found: {c_count}")
-    print(f"  phcs found: {p_count}")
-    print(f"  federatedModels found: {f_count}")
+def main():
+    parser = argparse.ArgumentParser(description="Seed Production Firestore Database for Creva Health")
+    parser.add_argument("--dry-run", action="store_true", help="Preview seed operations without writing to Firestore")
+    args = parser.parse_args()
 
-    if c_count < 5 or p_count < 19 or f_count < 1:
-        print("\nWARNING: Seed completed but verification failed.")
-        print("Check the Firestore Emulator project ID and port.")
+    print("====================================================")
+    print("Creva Health — Production Database Seeding Script")
+    print(f"Target Project: {PROJECT_ID}")
+    print("====================================================\n")
+
+    payloads = build_seed_payloads()
+
+    if args.dry_run:
+        print("[DRY-RUN MODE ACTIVATED] No data will be written to Cloud Firestore.\n")
+        print("Summary of data to be seeded:")
+        total_items = 0
+        for coll_name, items in payloads.items():
+            count = len(items)
+            total_items += count
+            exp = EXPECTED_COUNTS.get(coll_name, count)
+            status = "MATCH" if count == exp else f"MISMATCH (Expected: {exp})"
+            print(f"  • {coll_name:<16}: {count:>3} documents [{status}]")
+        print(f"\nTotal documents prepared: {total_items}")
+        print("\nDry run completed successfully. Remove --dry-run to write to production.")
+        return
+
+    # Check for GOOGLE_APPLICATION_CREDENTIALS environment variable
+    cred_path = os.environ.get("GOOGLE_APPLICATION_CREDENTIALS")
+    if not cred_path:
+        print("ERROR: Environment variable GOOGLE_APPLICATION_CREDENTIALS is not set.")
+        print("\nTo fix this:")
+        print("1. Download your service account key JSON from Firebase Console:")
+        print("   Project Settings -> Service Accounts -> Generate New Private Key")
+        print("2. Set the environment variable in your terminal:")
+        print("   Windows PowerShell : $env:GOOGLE_APPLICATION_CREDENTIALS='C:\\path\\to\\key.json'")
+        print("   Windows CMD        : set GOOGLE_APPLICATION_CREDENTIALS=C:\\path\\to\\key.json")
+        print("   Linux / macOS      : export GOOGLE_APPLICATION_CREDENTIALS='/path/to/key.json'")
+        print("3. Re-run python seed_production.py\n")
+        sys.exit(1)
+
+    if not os.path.exists(cred_path):
+        print(f"ERROR: Service account key file not found at path: {cred_path}")
+        print("Please check the filepath and try again.")
+        sys.exit(1)
+
+    # Initialize Firebase Admin SDK
+    try:
+        import firebase_admin
+        from firebase_admin import credentials, firestore
+    except ImportError:
+        print("ERROR: Required Python packages 'firebase-admin' and 'google-cloud-firestore' are missing.")
+        print("Install them by running: pip install firebase-admin google-cloud-firestore")
+        sys.exit(1)
+
+    try:
+        cred = credentials.Certificate(cred_path)
+        if not firebase_admin._apps:
+            firebase_admin.initialize_app(cred, {"projectId": PROJECT_ID})
+        db = firestore.client()
+        print(f"✓ Connected to Firebase Admin SDK for project: '{PROJECT_ID}'\n")
+    except Exception as e:
+        print(f"ERROR: Failed to initialize Firebase Admin SDK: {e}")
+        sys.exit(1)
+
+    # Write documents to Cloud Firestore
+    print("Writing documents to Cloud Firestore...")
+    total_written = 0
+    for coll_name, items in payloads.items():
+        print(f"\n--- Seeding collection: {coll_name} ({len(items)} documents) ---")
+        for doc_id, doc_data in items:
+            try:
+                db.collection(coll_name).document(doc_id).set(doc_data)
+                print(f"  ✓ WRITE {coll_name}/{doc_id}")
+                total_written += 1
+            except Exception as write_err:
+                print(f"  ✗ ERROR writing {coll_name}/{doc_id}: {write_err}")
+
+    print("\n====================================================")
+    print(f"Seeding completed. Total written: {total_written} documents.")
+    print("====================================================\n")
+
+    # Verification Step: Read document counts from production Firestore
+    print("Verifying Production Firestore Database Counts...")
+    actual_counts = {}
+    has_warning = False
+
+    for coll_name, exp_count in EXPECTED_COUNTS.items():
+        try:
+            docs = list(db.collection(coll_name).stream())
+            actual = len(docs)
+            actual_counts[coll_name] = actual
+            if actual == exp_count:
+                print(f"  ✓ {coll_name:<16}: {actual:>3} / {exp_count} docs [OK]")
+            else:
+                has_warning = True
+                print(f"  ⚠️ {coll_name:<16}: {actual:>3} / {exp_count} docs [MISMATCH]")
+        except Exception as read_err:
+            has_warning = True
+            print(f"  ✗ {coll_name:<16}: ERROR reading collection: {read_err}")
+
+    print("\n====================================================")
+    if has_warning:
+        print("WARNING: Seeding completed, but one or more collection counts differed from expected values.")
+        print("Please check your Cloud Firestore Security Rules or project permissions.")
+    else:
+        print("SUCCESS: All 8 collections seeded and verified with 100% exact match counts!")
+    print("====================================================")
 
 if __name__ == "__main__":
-    seed()
+    main()

@@ -12,7 +12,12 @@ import {
 import federatedTrainingLog from '../data/federatedTrainingLog.json';
 import { useLanguage } from '../i18n/LanguageContext';
 
-export default function FederatedIntelligence({ federatedModel, loading = false }) {
+export default function FederatedIntelligence({ 
+  federatedModel, 
+  districts = [], 
+  selectedState = 'Tamil Nadu', 
+  loading = false 
+}) {
   const { t } = useLanguage();
 
   if (loading) {
@@ -27,19 +32,28 @@ export default function FederatedIntelligence({ federatedModel, loading = false 
     );
   }
 
-  // Extract model parameters from Firestore or use fallback
-  const salemSlope = federatedModel?.nodes?.Salem?.slope ?? 0.05;
-  const salemStatus = federatedModel?.nodes?.Salem?.status ?? 'STABLE';
-  
-  const namakkalSlope = federatedModel?.nodes?.Namakkal?.slope ?? 11.93;
-  const namakkalStatus = federatedModel?.nodes?.Namakkal?.status ?? 'OUTBREAK';
-  
-  const erodeSlope = federatedModel?.nodes?.Erode?.slope ?? -0.02;
-  const erodeStatus = federatedModel?.nodes?.Erode?.status ?? 'STABLE';
+  // Extract districts of the selectedState
+  const stateDistricts = districts.filter(d => d.state === selectedState);
+  const activeDistNames = stateDistricts.length > 0 
+    ? stateDistricts.map(d => d.name)
+    : ['Salem', 'Namakkal', 'Erode'];
 
-  const aggregatorName = federatedModel?.aggregator ?? 'Tamil Nadu Central Aggregator';
+  const node1Name = activeDistNames[0] || 'Salem';
+  const node2Name = activeDistNames[1] || 'Namakkal';
+  const node3Name = activeDistNames[2] || 'Erode';
+
+  const node1Slope = federatedModel?.nodes?.[node1Name]?.slope ?? 0.05;
+  const node1Status = federatedModel?.nodes?.[node1Name]?.status ?? 'STABLE';
+  
+  const node2Slope = federatedModel?.nodes?.[node2Name]?.slope ?? 11.93;
+  const node2Status = federatedModel?.nodes?.[node2Name]?.status ?? 'OUTBREAK';
+  
+  const node3Slope = federatedModel?.nodes?.[node3Name]?.slope ?? -0.02;
+  const node3Status = federatedModel?.nodes?.[node3Name]?.status ?? 'STABLE';
+
+  const aggregatorName = federatedModel?.aggregator ?? `${selectedState} Central Aggregator`;
   const algorithmName = federatedModel?.algorithm ?? 'FedAvg';
-  const globalTrend = federatedModel?.global_trend ?? 3.42;
+  const globalTrend = federatedModel?.global_trend ?? 4.81;
 
   return (
     <div className="space-y-6 animate-fadeIn">
@@ -128,102 +142,113 @@ export default function FederatedIntelligence({ federatedModel, loading = false 
           {/* District Nodes Layer */}
           <div className="grid grid-cols-3 gap-3 relative z-10">
             
-            {/* Salem Node */}
-            <div className="bg-[#F8FAFC] border border-[#E2E8F0] rounded-[6px] p-3 space-y-1.5 relative">
+            {/* Node 1 */}
+            <div className={`group bg-white border rounded-[8px] p-3 flex flex-col justify-between hover:border-slate-300 transition-colors relative ${
+              node1Status === 'OUTBREAK' ? 'border-l-2 border-l-[#D64545]' : ''
+            }`}>
               <div className="flex items-center justify-between">
-                <span className="text-[10px] font-semibold text-[#0F172A] uppercase tracking-wider">{t('federated.node.salem')}</span>
+                <span className="text-[10px] font-semibold text-[#0F172A] uppercase tracking-wider">{node1Name} Node</span>
                 <span className="flex items-center gap-1">
                   <span className="h-1.5 w-1.5 rounded-full bg-[#0F6B66]"></span>
                   <span className="text-[9px] text-[#0F6B66] font-medium uppercase tracking-wider">{t('federated.node.online')}</span>
                 </span>
               </div>
-              <div className="space-y-0.5 text-[11px] text-[#64748B]">
+              <div className="space-y-0.5 text-[11px] text-[#64748B] mt-2">
                 <div className="flex justify-between">
                   <span>{t('federated.node.status')}</span>
-                  <span className={`font-mono font-medium ${salemStatus === 'OUTBREAK' ? 'text-[#D64545]' : 'text-[#0F6B66]'}`}>{salemStatus}</span>
+                  <span className={`font-mono font-bold ${node1Status === 'OUTBREAK' ? 'text-[#D64545]' : 'text-[#0F6B66]'}`}>{node1Status}</span>
                 </div>
                 <div className="flex justify-between">
                   <span>{t('federated.node.localTrend')}</span>
-                  <span className="font-mono text-[#0F172A] font-medium">{salemSlope >= 0 ? `+${salemSlope}` : salemSlope}</span>
+                  <span className="font-mono text-[#0F172A] font-semibold">{node1Slope >= 0 ? `+${node1Slope}` : node1Slope}</span>
                 </div>
               </div>
-              <div className="text-[9px] text-[#64748B] font-mono bg-white p-1 rounded border border-[#E2E8F0]/70 text-center">
+              <div className="text-[9px] text-[#64748B] font-mono bg-[#F8FAFC] p-1 rounded border border-[#E2E8F0]/70 text-center mt-2">
                 {t('federated.node.protected')}
               </div>
               
               {/* Downward Animation Line Container */}
               <div className="absolute left-1/2 -bottom-12 transform -translate-x-1/2 flex flex-col items-center">
                 <div className="h-12 w-px bg-dashed border-l border-[#E2E8F0]"></div>
-                <div className="absolute top-1 bg-white border border-[#E2E8F0] text-[#0F172A] text-[9px] font-mono px-1.5 py-0.5 rounded shadow-sm animate-flow-delay-0 z-20">
-                  {`{ slope: ${salemSlope} }`}
+                <div className={`absolute top-1 text-[9px] font-mono px-1.5 py-0.5 rounded shadow-sm z-20 animate-flow-delay-0 ${
+                  node1Status === 'OUTBREAK' ? 'bg-[#D64545]/10 border border-[#D64545]/20 text-[#D64545]' : 'bg-white border border-[#E2E8F0] text-[#0F172A]'
+                }`}>
+                  {`{ slope: ${node1Slope} }`}
                 </div>
               </div>
             </div>
 
-            {/* Namakkal Node */}
-            <div className="bg-[#F8FAFC] border border-[#E2E8F0] rounded-[6px] p-3 space-y-1.5 relative">
+            {/* Node 2 */}
+            <div className={`group bg-white border rounded-[8px] p-3 flex flex-col justify-between hover:border-slate-300 transition-colors relative ${
+              node2Status === 'OUTBREAK' ? 'border-l-2 border-l-[#D64545]' : ''
+            }`}>
               <div className="flex items-center justify-between">
-                <span className="text-[10px] font-semibold text-[#0F172A] uppercase tracking-wider">{t('federated.node.namakkal')}</span>
+                <span className="text-[10px] font-semibold text-[#0F172A] uppercase tracking-wider">{node2Name} Node</span>
                 <span className="flex items-center gap-1">
                   <span className="h-1.5 w-1.5 rounded-full bg-[#0F6B66]"></span>
                   <span className="text-[9px] text-[#0F6B66] font-medium uppercase tracking-wider">{t('federated.node.online')}</span>
                 </span>
               </div>
-              <div className="space-y-0.5 text-[11px] text-[#64748B]">
+              <div className="space-y-0.5 text-[11px] text-[#64748B] mt-2">
                 <div className="flex justify-between">
                   <span>{t('federated.node.status')}</span>
-                  <span className={`font-mono font-medium ${namakkalStatus === 'OUTBREAK' ? 'text-[#D64545]' : 'text-[#0F6B66]'}`}>{namakkalStatus}</span>
+                  <span className={`font-mono font-bold ${node2Status === 'OUTBREAK' ? 'text-[#D64545]' : 'text-[#0F6B66]'}`}>{node2Status}</span>
                 </div>
                 <div className="flex justify-between">
                   <span>{t('federated.node.localTrend')}</span>
-                  <span className="font-mono text-[#0F172A] font-medium">{namakkalSlope >= 0 ? `+${namakkalSlope}` : namakkalSlope}</span>
+                  <span className="font-mono text-[#0F172A] font-semibold">{node2Slope >= 0 ? `+${node2Slope}` : node2Slope}</span>
                 </div>
               </div>
-              <div className="text-[9px] text-[#64748B] font-mono bg-white p-1 rounded border border-[#E2E8F0]/70 text-center">
+              <div className="text-[9px] text-[#64748B] font-mono bg-[#F8FAFC] p-1 rounded border border-[#E2E8F0]/70 text-center mt-2">
                 {t('federated.node.protected')}
               </div>
 
               {/* Downward Animation Line Container */}
               <div className="absolute left-1/2 -bottom-12 transform -translate-x-1/2 flex flex-col items-center">
                 <div className="h-12 w-px bg-dashed border-l border-[#E2E8F0]"></div>
-                <div className="absolute top-1 bg-[#D64545]/10 border border-[#D64545]/20 text-[#D64545] text-[9px] font-mono px-1.5 py-0.5 rounded shadow-sm animate-flow-delay-1 z-20">
-                  {`{ slope: ${namakkalSlope} }`}
+                <div className={`absolute top-1 text-[9px] font-mono px-1.5 py-0.5 rounded shadow-sm z-20 animate-flow-delay-1 ${
+                  node2Status === 'OUTBREAK' ? 'bg-[#D64545]/10 border border-[#D64545]/20 text-[#D64545]' : 'bg-white border border-[#E2E8F0] text-[#0F172A]'
+                }`}>
+                  {`{ slope: ${node2Slope} }`}
                 </div>
               </div>
             </div>
 
-            {/* Erode Node */}
-            <div className="bg-[#F8FAFC] border border-[#E2E8F0] rounded-[6px] p-3 space-y-1.5 relative">
+            {/* Node 3 */}
+            <div className={`group bg-white border rounded-[8px] p-3 flex flex-col justify-between hover:border-slate-300 transition-colors relative ${
+              node3Status === 'OUTBREAK' ? 'border-l-2 border-l-[#D64545]' : ''
+            }`}>
               <div className="flex items-center justify-between">
-                <span className="text-[10px] font-semibold text-[#0F172A] uppercase tracking-wider">{t('federated.node.erode')}</span>
+                <span className="text-[10px] font-semibold text-[#0F172A] uppercase tracking-wider">{node3Name} Node</span>
                 <span className="flex items-center gap-1">
                   <span className="h-1.5 w-1.5 rounded-full bg-[#0F6B66]"></span>
                   <span className="text-[9px] text-[#0F6B66] font-medium uppercase tracking-wider">{t('federated.node.online')}</span>
                 </span>
               </div>
-              <div className="space-y-0.5 text-[11px] text-[#64748B]">
+              <div className="space-y-0.5 text-[11px] text-[#64748B] mt-2">
                 <div className="flex justify-between">
                   <span>{t('federated.node.status')}</span>
-                  <span className={`font-mono font-medium ${erodeStatus === 'OUTBREAK' ? 'text-[#D64545]' : 'text-[#0F6B66]'}`}>{erodeStatus}</span>
+                  <span className={`font-mono font-bold ${node3Status === 'OUTBREAK' ? 'text-[#D64545]' : 'text-[#0F6B66]'}`}>{node3Status}</span>
                 </div>
                 <div className="flex justify-between">
                   <span>{t('federated.node.localTrend')}</span>
-                  <span className="font-mono text-[#0F172A] font-medium">{erodeSlope >= 0 ? `+${erodeSlope}` : erodeSlope}</span>
+                  <span className="font-mono text-[#0F172A] font-semibold">{node3Slope >= 0 ? `+${node3Slope}` : node3Slope}</span>
                 </div>
               </div>
-              <div className="text-[9px] text-[#64748B] font-mono bg-white p-1 rounded border border-[#E2E8F0]/70 text-center">
+              <div className="text-[9px] text-[#64748B] font-mono bg-[#F8FAFC] p-1 rounded border border-[#E2E8F0]/70 text-center mt-2">
                 {t('federated.node.protected')}
               </div>
 
               {/* Downward Animation Line Container */}
               <div className="absolute left-1/2 -bottom-12 transform -translate-x-1/2 flex flex-col items-center">
                 <div className="h-12 w-px bg-dashed border-l border-[#E2E8F0]"></div>
-                <div className="absolute top-1 bg-white border border-[#E2E8F0] text-[#0F172A] text-[9px] font-mono px-1.5 py-0.5 rounded shadow-sm animate-flow-delay-2 z-20">
-                  {`{ slope: ${erodeSlope} }`}
+                <div className={`absolute top-1 text-[9px] font-mono px-1.5 py-0.5 rounded shadow-sm z-20 animate-flow-delay-2 ${
+                  node3Status === 'OUTBREAK' ? 'bg-[#D64545]/10 border border-[#D64545]/20 text-[#D64545]' : 'bg-white border border-[#E2E8F0] text-[#0F172A]'
+                }`}>
+                  {`{ slope: ${node3Slope} }`}
                 </div>
               </div>
             </div>
-
           </div>
 
           {/* Spacer to give room for animation */}
@@ -249,7 +274,7 @@ export default function FederatedIntelligence({ federatedModel, loading = false 
               <div className="space-y-1">
                 <span className="text-[#64748B] uppercase tracking-wider text-[9px] font-semibold">{t('federated.agg.params')}</span>
                 <p className="text-[#1E293B] font-mono bg-white p-2 rounded border border-[#E2E8F0] leading-relaxed text-[10px]">
-                  Global_Trend = (w_salem * slope_salem) + (w_namakkal * slope_namakkal) + (w_erode * slope_erode)
+                  Global_Trend = (w_{node1Name.toLowerCase()} * slope_{node1Name.toLowerCase()}) + (w_{node2Name.toLowerCase()} * slope_{node2Name.toLowerCase()}) + (w_{node3Name.toLowerCase()} * slope_{node3Name.toLowerCase()})
                 </p>
               </div>
 
@@ -258,7 +283,7 @@ export default function FederatedIntelligence({ federatedModel, loading = false 
                 <div className="p-3 bg-red-50/50 border border-red-100 text-[#D64545] rounded-[6px] space-y-1">
                   <div className="font-semibold text-[11px] uppercase tracking-wide">{t('federated.agg.riskConfirmed')}</div>
                   <p className="text-[10px] text-red-700 leading-normal">
-                    {t('federated.agg.riskDesc')}
+                    Aggregate regression models confirm an escalating slope mismatch. {[node1Name, node2Name, node3Name].find(name => (federatedModel?.nodes?.[name]?.status || (name === 'Namakkal' || name === 'Thrissur' ? 'OUTBREAK' : 'STABLE')) === 'OUTBREAK')} region is identified as the outbreak epicentre (Severe deficit slope &ge; {Math.max(node1Slope, node2Slope, node3Slope) || 11.5}). {[node1Name, node2Name, node3Name].filter(name => (federatedModel?.nodes?.[name]?.status || (name === 'Namakkal' || name === 'Thrissur' ? 'OUTBREAK' : 'STABLE')) !== 'OUTBREAK').join(' & ')} are verified as stable surplus buffers.
                   </p>
                 </div>
               </div>
@@ -308,7 +333,7 @@ export default function FederatedIntelligence({ federatedModel, loading = false 
                   wrapperStyle={{ fontSize: '10px', paddingTop: '10px' }} 
                 />
                 <Line 
-                  name={t('federated.history.salemClient')} 
+                  name={`${node1Name} Client`} 
                   type="monotone" 
                   dataKey="Salem" 
                   stroke="#0F6B66" 
@@ -317,7 +342,7 @@ export default function FederatedIntelligence({ federatedModel, loading = false 
                   activeDot={{ r: 5 }}
                 />
                 <Line 
-                  name={t('federated.history.erodeClient')} 
+                  name={`${node3Name} Client`} 
                   type="monotone" 
                   dataKey="Erode" 
                   stroke="#E8A33D" 
@@ -326,7 +351,7 @@ export default function FederatedIntelligence({ federatedModel, loading = false 
                   activeDot={{ r: 5 }}
                 />
                 <Line 
-                  name={t('federated.history.namakkalClient')} 
+                  name={`${node2Name} Client`} 
                   type="monotone" 
                   dataKey="Namakkal" 
                   stroke="#D64545" 

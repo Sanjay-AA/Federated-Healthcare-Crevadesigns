@@ -13,6 +13,7 @@ import {
 import { useLanguage } from './i18n/LanguageContext';
 
 import Dashboard from './pages/Dashboard';
+import IndiaOverview from './pages/IndiaOverview';
 import PhcDetail from './pages/PhcDetail';
 import FederatedIntelligence from './pages/FederatedIntelligence';
 import DistrictsSummary from './pages/DistrictsSummary';
@@ -22,9 +23,11 @@ import BricsNetwork from './pages/BricsNetwork';
 function App() {
   const { language, setLanguage, t } = useLanguage();
   const [selectedPhc, setSelectedPhc] = useState(null);
-  const [activeTab, setActiveTab] = useState('dashboard');
+  const [activeTab, setActiveTab] = useState('india');
   const [districtFilter, setDistrictFilter] = useState('All');
   const [liveTimestamp, setLiveTimestamp] = useState('');
+  const [selectedState, setSelectedState] = useState('Tamil Nadu');
+  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
 
   // Firestore collections state
   const [phcs, setPhcs] = useState([]);
@@ -38,6 +41,65 @@ function App() {
 
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+
+  // Dynamic state list derived from loaded districts
+  const availableStates = Array.from(new Set(districts.map(d => d.state).filter(Boolean)));
+  if (availableStates.length === 0) {
+    availableStates.push('Tamil Nadu');
+  }
+
+  // Filtered collections by selectedState
+  const filteredDistricts = districts.filter(d => d.state === selectedState);
+  
+  const filteredPhcs = phcs.filter(p => {
+    if (p.state) return p.state === selectedState;
+    const distDoc = districts.find(d => d.name === p.district);
+    return distDoc?.state === selectedState || (!distDoc && selectedState === 'Tamil Nadu');
+  });
+
+  const filteredMedicines = medicines.filter(m => {
+    if (m.state) return m.state === selectedState;
+    const phcDoc = phcs.find(p => p.id === m.phc_id);
+    if (phcDoc?.state) return phcDoc.state === selectedState;
+    const distDoc = districts.find(d => d.name === (phcDoc?.district || m.district));
+    return distDoc?.state === selectedState || (!distDoc && selectedState === 'Tamil Nadu');
+  });
+
+  const filteredAlerts = alerts.filter(a => {
+    if (a.state) return a.state === selectedState;
+    if (a.district) {
+      const distDoc = districts.find(d => d.name === a.district);
+      return distDoc?.state === selectedState;
+    }
+    return false;
+  });
+
+  const filteredTransfers = transfers.filter(t => {
+    if (t.state) return t.state === selectedState;
+    const phcDoc = phcs.find(p => p.id === t.from_phc_id);
+    if (phcDoc?.state) return phcDoc.state === selectedState;
+    const distDoc = districts.find(d => d.name === phcDoc?.district);
+    return distDoc?.state === selectedState;
+  });
+
+  const filteredDiseaseReports = diseaseReports.filter(r => {
+    if (r.state) return r.state === selectedState;
+    const distDoc = districts.find(d => d.name === r.district);
+    return distDoc?.state === selectedState;
+  });
+
+  const handleStateChange = (stateName) => {
+    setSelectedState(stateName);
+    setDistrictFilter('All');
+    setSelectedPhc(null);
+  };
+
+  const handleSelectState = (stateName) => {
+    setSelectedState(stateName);
+    setDistrictFilter('All');
+    setSelectedPhc(null);
+    setActiveTab('dashboard');
+  };
 
   useEffect(() => {
     let isMounted = true;
@@ -116,30 +178,69 @@ function App() {
   const handleNavClick = (tab) => {
     setActiveTab(tab);
     setSelectedPhc(null);
+    setIsMobileMenuOpen(false);
   };
 
   return (
-    <div className="min-h-screen bg-[#F8FAFC] text-[#0F172A] flex font-sans antialiased">
+    <div className="min-h-screen bg-[#F8FAFC] text-[#0F172A] flex font-sans antialiased relative overflow-x-hidden">
+      
+      {/* Mobile Drawer Backdrop */}
+      {isMobileMenuOpen && (
+        <div 
+          onClick={() => setIsMobileMenuOpen(false)}
+          className="fixed inset-0 bg-slate-900/40 z-40 md:hidden backdrop-blur-xs transition-opacity"
+        />
+      )}
+
       {/* 1. SIDEBAR */}
-      <aside className="w-60 bg-white border-r border-[#E2E8F0] flex flex-col justify-between shrink-0">
+      <aside className={`bg-white border-r border-[#E2E8F0] flex flex-col justify-between shrink-0 transition-all duration-200 z-50 ${
+        isMobileMenuOpen 
+          ? 'fixed inset-y-0 left-0 w-64 shadow-xl flex' 
+          : 'hidden md:flex md:w-60'
+      }`}>
         <div className="flex flex-col">
           {/* Logo / Branding */}
-          <div className="h-14 px-4 border-b border-[#E2E8F0] flex flex-col justify-center">
-            <span className="font-sans font-bold text-[13px] tracking-tight text-[#0F172A] leading-none">
-              {t('app.title')}
-            </span>
-            <span className="text-[9px] text-[#64748B] font-medium tracking-wide uppercase mt-1">
-              {t('app.subtitle')}
-            </span>
+          <div className="h-14 px-4 border-b border-[#E2E8F0] flex items-center justify-between">
+            <div className="flex flex-col justify-center">
+              <span className="font-sans font-bold text-[13px] tracking-tight text-[#0F172A] leading-none">
+                {t('app.title')}
+              </span>
+              <span className="text-[9px] text-[#64748B] font-medium tracking-wide uppercase mt-1">
+                {t('app.subtitle')}
+              </span>
+            </div>
+            {isMobileMenuOpen && (
+              <button 
+                onClick={() => setIsMobileMenuOpen(false)}
+                className="md:hidden p-1 text-[#64748B] hover:text-[#0F172A] cursor-pointer"
+              >
+                ✕
+              </button>
+            )}
           </div>
 
           {/* Navigation Links */}
           <nav className="py-3 px-2 space-y-1">
             <button
+              onClick={() => handleNavClick('india')}
+              className={`w-full flex items-center gap-2.5 px-2.5 py-2 text-[13px] font-medium rounded-[6px] select-none cursor-pointer transition-all duration-150 ${
+                activeTab === 'india'
+                  ? 'bg-[#1D4E89]/10 text-[#1D4E89] font-bold border border-[#1D4E89]/20'
+                  : 'text-[#64748B] hover:text-[#0F172A] hover:bg-slate-50'
+              }`}
+            >
+              {/* India / Network Globe Icon */}
+              <svg className="w-[18px] h-[18px] shrink-0 text-[#1D4E89]" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8} d="M3.055 11H5a2 2 0 012 2v1a2 2 0 002 2 2 2 0 012 2v2.945M8 3.935V5.5A2.5 2.5 0 0010.5 8h.5a2 2 0 012 2 2 2 0 002 2h1.5a2.5 2.5 0 002.5-2.5V8.5a.5.5 0 01.5-.5h.5a2.5 2.5 0 002.5-2.5V3.935M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+              </svg>
+              {t('app.nav.indiaOverview') || 'India Overview'}
+            </button>
+
+            <button
               onClick={() => handleNavClick('dashboard')}
               className={`w-full flex items-center gap-2 px-2.5 py-2 text-[13px] font-medium rounded-[6px] select-none cursor-pointer transition-all duration-150 ${
                 activeTab === 'dashboard'
-                  ? 'bg-slate-100 text-[#0F172A]'
+                  ? 'bg-slate-100 text-[#0F172A] font-bold'
                   : 'text-[#64748B] hover:text-[#0F172A] hover:bg-slate-50'
               }`}
             >
@@ -154,7 +255,7 @@ function App() {
               onClick={() => handleNavClick('districts')}
               className={`w-full flex items-center gap-2.5 px-2.5 py-2 text-[13px] font-medium rounded-[6px] select-none cursor-pointer transition-all duration-150 ${
                 activeTab === 'districts'
-                  ? 'bg-slate-100 text-[#0F172A]'
+                  ? 'bg-slate-100 text-[#0F172A] font-bold'
                   : 'text-[#64748B] hover:text-[#0F172A] hover:bg-slate-50'
               }`}
             >
@@ -169,7 +270,7 @@ function App() {
               onClick={() => handleNavClick('alerts')}
               className={`w-full flex items-center gap-2.5 px-2.5 py-2 text-[13px] font-medium rounded-[6px] select-none cursor-pointer transition-all duration-150 ${
                 activeTab === 'alerts'
-                  ? 'bg-slate-100 text-[#0F172A]'
+                  ? 'bg-slate-100 text-[#0F172A] font-bold'
                   : 'text-[#64748B] hover:text-[#0F172A] hover:bg-slate-50'
               }`}
             >
@@ -184,7 +285,7 @@ function App() {
               onClick={() => handleNavClick('federated')}
               className={`w-full flex items-center gap-2.5 px-2.5 py-2 text-[13px] font-medium rounded-[6px] select-none cursor-pointer transition-all duration-150 ${
                 activeTab === 'federated'
-                  ? 'bg-slate-100 text-[#0F172A]'
+                  ? 'bg-slate-100 text-[#0F172A] font-bold'
                   : 'text-[#64748B] hover:text-[#0F172A] hover:bg-slate-50'
               }`}
             >
@@ -200,7 +301,7 @@ function App() {
               onClick={() => handleNavClick('brics')}
               className={`w-full flex items-center gap-2.5 px-2.5 py-2 text-[13px] font-medium rounded-[6px] select-none cursor-pointer transition-all duration-150 ${
                 activeTab === 'brics'
-                  ? 'bg-slate-100 text-[#0F172A]'
+                  ? 'bg-slate-100 text-[#0F172A] font-bold'
                   : 'text-[#64748B] hover:text-[#0F172A] hover:bg-slate-50'
               }`}
             >
@@ -222,11 +323,12 @@ function App() {
           <select
             value={language}
             onChange={(e) => setLanguage(e.target.value)}
-            className="w-full bg-white border border-slate-200 rounded px-2.5 py-1 text-xs text-[#0F172A] font-medium outline-none cursor-pointer hover:border-slate-300 transition-colors"
+            className="w-full bg-white border border-slate-200 rounded px-2.5 py-1 text-xs text-[#0F172A] font-medium outline-none cursor-pointer hover:border-slate-300 transition-colors focus:ring-2 focus:ring-[#1D4E89]/20"
           >
             <option value="en">English</option>
             <option value="hi">हिंदी</option>
             <option value="ta">தமிழ்</option>
+            <option value="ml">മലയാളം</option>
           </select>
           <div className="text-[9px] text-[#64748B] font-medium tracking-wider font-mono uppercase bg-[#F8FAFC] py-1 rounded border border-[#E2E8F0] text-center">
             {t('app.status.emulatorSecure')}
@@ -238,17 +340,34 @@ function App() {
       <div className="flex-1 flex flex-col min-w-0">
         
         {/* Top Operations Header */}
-        <header className="bg-white border-b border-[#E2E8F0] h-14 px-6 flex items-center justify-between shrink-0">
-          <div>
-            <h2 className="font-sans font-semibold text-[14px] text-[#0F172A] leading-tight">
-              {t('app.header.title')}
-            </h2>
-            <p className="text-[9px] text-[#64748B] font-medium uppercase tracking-wider mt-0.5">
-              {t('app.header.subtitle')}
-            </p>
+        <header className="bg-white border-b border-[#E2E8F0] min-h-14 px-4 md:px-6 py-2 flex flex-wrap items-center justify-between gap-3 shrink-0">
+          <div className="flex items-center gap-3">
+            <button
+              onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
+              className="md:hidden p-1.5 text-[#64748B] hover:text-[#0F172A] hover:bg-slate-100 rounded cursor-pointer"
+              title="Toggle Menu"
+            >
+              <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
+              </svg>
+            </button>
+            <div>
+              <h2 className="font-sans font-semibold text-[13px] md:text-[14px] text-[#0F172A] leading-tight">
+                {activeTab === 'india' 
+                  ? t('app.header.indiaTitle') 
+                  : selectedState === 'Tamil Nadu' 
+                  ? t('app.header.title') 
+                  : t('app.header.stateCommandCenter', { state: selectedState })}
+              </h2>
+              <p className="text-[9px] text-[#64748B] font-medium uppercase tracking-wider mt-0.5">
+                {activeTab === 'india' 
+                  ? t('app.header.indiaSubtitle') 
+                  : t('app.header.subtitle')}
+              </p>
+            </div>
           </div>
 
-          <div className="flex items-center gap-4">
+          <div className="flex flex-wrap items-center gap-3 md:gap-4 text-xs">
             {/* Live system status */}
             <div className="flex items-center gap-1">
               <span className="h-1.5 w-1.5 rounded-full bg-[#0F6B66] animate-pulse"></span>
@@ -256,21 +375,37 @@ function App() {
             </div>
 
             {/* Last updated */}
-            <div className="text-[11px] text-[#64748B] font-mono">
+            <div className="text-[11px] text-[#64748B] font-mono hidden sm:block">
               {t('app.header.updated')} {liveTimestamp}
             </div>
 
+            {/* State filter */}
+            {(activeTab === 'dashboard' || activeTab === 'districts') && !selectedPhc && (
+              <div className="flex items-center gap-1.5">
+                <span className="text-[10px] font-semibold text-[#64748B] uppercase tracking-wider">{t('app.header.stateFilter')}</span>
+                <select
+                  value={selectedState}
+                  onChange={(e) => handleStateChange(e.target.value)}
+                  className="bg-white border border-slate-200 rounded px-2.5 py-1 text-xs text-[#0F172A] font-medium outline-none cursor-pointer hover:border-slate-300 transition-colors focus:ring-2 focus:ring-[#1D4E89]/20"
+                >
+                  {availableStates.map((st) => (
+                    <option key={st} value={st}>{st}</option>
+                  ))}
+                </select>
+              </div>
+            )}
+
             {/* District filter */}
             {activeTab === 'dashboard' && !selectedPhc && (
-              <div className="flex items-center gap-2">
+              <div className="flex items-center gap-1.5">
                 <span className="text-[10px] font-semibold text-[#64748B] uppercase tracking-wider">{t('app.header.filter')}</span>
                 <select
                   value={districtFilter}
                   onChange={(e) => setDistrictFilter(e.target.value)}
-                  className="bg-white border border-slate-200 rounded px-2.5 py-1 text-xs text-[#0F172A] font-medium outline-none cursor-pointer hover:border-slate-300 transition-colors"
+                  className="bg-white border border-slate-200 rounded px-2.5 py-1 text-xs text-[#0F172A] font-medium outline-none cursor-pointer hover:border-slate-300 transition-colors focus:ring-2 focus:ring-[#1D4E89]/20"
                 >
                   <option value="All">{t('app.header.allDistricts')}</option>
-                  {(districts && districts.length > 0 ? districts.map(d => d.name) : ['Salem', 'Erode', 'Namakkal']).map((dName) => (
+                  {(filteredDistricts.length > 0 ? filteredDistricts.map(d => d.name) : ['Salem', 'Erode', 'Namakkal']).map((dName) => (
                     <option key={dName} value={dName}>{dName}</option>
                   ))}
                 </select>
@@ -295,34 +430,49 @@ function App() {
             </div>
           )}
 
-          {activeTab === 'dashboard' ? (
+          {activeTab === 'india' ? (
+            <IndiaOverview
+              phcs={phcs}
+              medicines={medicines}
+              diseaseReports={diseaseReports}
+              alerts={alerts}
+              transfers={transfers}
+              districts={districts}
+              federatedModel={federatedModel}
+              loading={loading}
+              onSelectState={handleSelectState}
+              onNavigateTab={handleNavClick}
+            />
+          ) : activeTab === 'dashboard' ? (
             selectedPhc ? (
               <PhcDetail 
                 phc={selectedPhc} 
-                medicines={medicines}
+                phcs={filteredPhcs}
+                medicines={filteredMedicines}
                 loading={loading}
                 onBack={() => setSelectedPhc(null)} 
               />
             ) : (
               <Dashboard 
-                phcs={phcs} 
-                medicines={medicines}
-                transfers={transfers}
-                districts={districts}
-                diseaseReports={diseaseReports}
+                phcs={filteredPhcs} 
+                medicines={filteredMedicines}
+                transfers={filteredTransfers}
+                districts={filteredDistricts}
+                diseaseReports={filteredDiseaseReports}
                 federatedModel={federatedModel}
                 loading={loading}
                 error={error}
                 onSelectPhc={setSelectedPhc} 
                 districtFilter={districtFilter}
+                onBackToIndia={() => handleNavClick('india')}
               />
             )
           ) : activeTab === 'districts' ? (
             <DistrictsSummary 
-              phcs={phcs} 
-              medicines={medicines}
-              districts={districts}
-              diseaseReports={diseaseReports}
+              phcs={filteredPhcs} 
+              medicines={filteredMedicines}
+              districts={filteredDistricts}
+              diseaseReports={filteredDiseaseReports}
               federatedModel={federatedModel}
               loading={loading}
               onSelectDistrict={(d) => {
@@ -332,9 +482,9 @@ function App() {
             />
           ) : activeTab === 'alerts' ? (
             <AlertsList 
-              phcs={phcs} 
-              medicines={medicines}
-              alerts={alerts}
+              phcs={filteredPhcs} 
+              medicines={filteredMedicines}
+              alerts={filteredAlerts}
               loading={loading}
               onSelectPhc={(phc) => {
                 setSelectedPhc(phc);
@@ -344,6 +494,8 @@ function App() {
           ) : activeTab === 'federated' ? (
             <FederatedIntelligence 
               federatedModel={federatedModel}
+              districts={districts}
+              selectedState={selectedState}
               loading={loading}
             />
           ) : activeTab === 'brics' ? (

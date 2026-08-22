@@ -13,7 +13,8 @@ export default function Dashboard({
   federatedModel = null, 
   loading = false, 
   onSelectPhc, 
-  districtFilter 
+  districtFilter,
+  onBackToIndia
 }) {
   const { t } = useLanguage();
   const [dispatchedRecs, setDispatchedRecs] = useState({});
@@ -158,36 +159,71 @@ export default function Dashboard({
   }
 
   return (
-    <div className="grid grid-cols-1 xl:grid-cols-4 gap-6 items-start animate-fadeIn">
-      
-      {/* LEFT COLUMN: MAIN WORKSPACE (KPIs, Recommendations, PHC Grids) */}
-      <div className="xl:col-span-3 space-y-6">
+    <div className="space-y-4 animate-fadeIn">
+      {onBackToIndia && (
+        <div className="flex items-center justify-between bg-white border border-[#E2E8F0] px-4 py-2.5 rounded-lg shadow-2xs">
+          <button
+            type="button"
+            onClick={onBackToIndia}
+            className="inline-flex items-center gap-1.5 px-3 py-1 text-xs font-semibold text-[#1D4E89] bg-blue-50 hover:bg-blue-100 border border-blue-200 rounded-md transition-colors cursor-pointer"
+          >
+            <span>← India Overview</span>
+          </button>
+          <span className="text-xs font-semibold text-[#64748B]">
+            Viewing State Command Center
+          </span>
+        </div>
+      )}
+
+      <div className="grid grid-cols-1 xl:grid-cols-4 gap-6 items-start">
+        {/* LEFT COLUMN: MAIN WORKSPACE (KPIs, Recommendations, PHC Grids) */}
+        <div className="xl:col-span-3 space-y-5">
         
+        {/* Critical Operations Alert Banner */}
+        {criticalCount > 0 && (
+          <div className="bg-[#D64545]/10 border border-[#D64545]/20 rounded-[8px] p-3 px-4 flex items-center justify-between gap-3 text-xs">
+            <div className="flex items-center gap-2 text-[#D64545]">
+              <span className="font-bold flex items-center gap-1.5 uppercase text-[11px] tracking-wide shrink-0">
+                <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                </svg>
+                Critical Alert
+              </span>
+              <span className="text-[#0F172A] font-medium hidden sm:inline">
+                {criticalCount} facility node(s) currently experiencing severe stockout or capacity pressure.
+              </span>
+            </div>
+            <span className="text-[10px] font-mono font-bold text-[#D64545] bg-[#D64545]/10 px-2 py-0.5 rounded border border-[#D64545]/20">
+              ATTENTION REQUIRED
+            </span>
+          </div>
+        )}
+
         {/* A. DYNAMIC KPI ROW */}
-        <div className="bg-white border border-[#E2E8F0] rounded-[8px] p-3 px-4 grid grid-cols-2 md:grid-cols-3 xl:grid-cols-6 gap-3">
-          <div className="text-center md:text-left border-r border-[#E2E8F0] pr-1">
-            <span className="text-[11px] font-medium text-[#64748B] uppercase tracking-wider">{t('dashboard.kpi.totalPhcs')}</span>
-            <div className="font-sans text-lg font-semibold text-[#0F172A] mt-0.5">{totalPhcs}</div>
+        <div className="bg-white border border-[#E2E8F0] rounded-[8px] p-3.5 px-4 grid grid-cols-2 sm:grid-cols-3 xl:grid-cols-6 gap-3 shadow-xs">
+          <div className="text-left border-r border-[#E2E8F0] pr-2">
+            <span className="text-[10px] font-bold text-[#64748B] uppercase tracking-wider block">{t('dashboard.kpi.totalPhcs')}</span>
+            <div className="font-sans text-lg font-bold text-[#0F172A] mt-0.5">{totalPhcs}</div>
           </div>
-          <div className="text-center md:text-left border-r border-[#E2E8F0] pr-1">
-            <span className="text-[11px] font-medium text-[#64748B] uppercase tracking-wider">{t('dashboard.kpi.criticalNodes')}</span>
-            <div className="font-sans text-lg font-semibold text-[#D64545] mt-0.5">{criticalCount}</div>
+          <div className="text-left border-r border-[#E2E8F0] pr-2">
+            <span className="text-[10px] font-bold text-[#64748B] uppercase tracking-wider block">{t('dashboard.kpi.criticalNodes')}</span>
+            <div className="font-sans text-lg font-bold text-[#D64545] mt-0.5">{criticalCount}</div>
           </div>
-          <div className="text-center md:text-left border-r border-[#E2E8F0] pr-1">
-            <span className="text-[11px] font-medium text-[#64748B] uppercase tracking-wider">{t('dashboard.kpi.atRiskNodes')}</span>
-            <div className="font-sans text-lg font-semibold text-[#E8A33D] mt-0.5">{atRiskCount}</div>
+          <div className="text-left border-r border-[#E2E8F0] pr-2">
+            <span className="text-[10px] font-bold text-[#64748B] uppercase tracking-wider block">{t('dashboard.kpi.atRiskNodes')}</span>
+            <div className="font-sans text-lg font-bold text-[#E8A33D] mt-0.5">{atRiskCount}</div>
           </div>
-          <div className="text-center md:text-left border-r border-[#E2E8F0] pr-1">
-            <span className="text-[11px] font-medium text-[#64748B] uppercase tracking-wider">{t('dashboard.kpi.bedUtilization')}</span>
-            <div className="font-sans text-lg font-semibold text-[#0F172A] mt-0.5">{bedUtilization}%</div>
+          <div className="text-left border-r border-[#E2E8F0] pr-2">
+            <span className="text-[10px] font-bold text-[#64748B] uppercase tracking-wider block">{t('dashboard.kpi.bedUtilization')}</span>
+            <div className="font-sans text-lg font-bold text-[#0F172A] mt-0.5">{bedUtilization}%</div>
           </div>
-          <div className="text-center md:text-left border-r border-[#E2E8F0] pr-1">
-            <span className="text-[11px] font-medium text-[#64748B] uppercase tracking-wider">{t('dashboard.kpi.staffOnDuty')}</span>
-            <div className="font-sans text-lg font-semibold text-[#0F172A] mt-0.5">{staffAvailability}%</div>
+          <div className="text-left border-r border-[#E2E8F0] pr-2">
+            <span className="text-[10px] font-bold text-[#64748B] uppercase tracking-wider block">{t('dashboard.kpi.staffOnDuty')}</span>
+            <div className="font-sans text-lg font-bold text-[#0F172A] mt-0.5">{staffAvailability}%</div>
           </div>
-          <div className="text-center md:text-left pr-1">
-            <span className="text-[11px] font-medium text-[#64748B] uppercase tracking-wider">{t('dashboard.kpi.drugShortages')}</span>
-            <div className="font-sans text-lg font-semibold text-[#D64545] mt-0.5">{medicineShortages}</div>
+          <div className="text-left pr-1">
+            <span className="text-[10px] font-bold text-[#64748B] uppercase tracking-wider block">{t('dashboard.kpi.drugShortages')}</span>
+            <div className="font-sans text-lg font-bold text-[#D64545] mt-0.5">{medicineShortages}</div>
           </div>
         </div>
 
@@ -441,8 +477,9 @@ export default function Dashboard({
           </p>
         </div>
 
-      </div>
+        </div>
 
+      </div>
     </div>
   );
 }

@@ -2,8 +2,9 @@ import React, { createContext, useContext, useState } from 'react';
 import en from './translations/en.json';
 import hi from './translations/hi.json';
 import ta from './translations/ta.json';
+import ml from './translations/ml.json';
 
-const translations = { en, hi, ta };
+const translations = { en, hi, ta, ml };
 
 const LanguageContext = createContext();
 
@@ -11,14 +12,14 @@ export function LanguageProvider({ children }) {
   const [language, setLanguageState] = useState(() => {
     try {
       const saved = localStorage.getItem('app_language');
-      return saved && ['en', 'hi', 'ta'].includes(saved) ? saved : 'en';
+      return saved && ['en', 'hi', 'ta', 'ml'].includes(saved) ? saved : 'en';
     } catch {
       return 'en';
     }
   });
 
   const setLanguage = (lang) => {
-    if (['en', 'hi', 'ta'].includes(lang)) {
+    if (['en', 'hi', 'ta', 'ml'].includes(lang)) {
       setLanguageState(lang);
       try {
         localStorage.setItem('app_language', lang);

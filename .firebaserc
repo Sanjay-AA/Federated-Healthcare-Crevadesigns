@@ -1,5 +1,8 @@
 {
   "projects": {
-    "default": "demo-federated-healthcare"
-  }
+    "default": "demo-federated-healthcare",
+    "prod": "federated-healthcare-3fcd3"
+  },
+  "targets": {},
+  "etags": {}
 }

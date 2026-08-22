@@ -26,7 +26,7 @@ export default function AlertsList({ phcs = [], medicines = [], alerts = [], loa
     alerts.forEach((alertDoc) => {
       const phc = phcs.find(p => p.id === alertDoc.phc_id);
       const med = activeMedsSource.find(m => m.id === alertDoc.medicine_id || (m.phc_id === alertDoc.phc_id && m.name === alertDoc.medicine_name)) || {
-        name: alertDoc.medicine_name || "Critical Item",
+        name: alertDoc.medicine_name || t('alertsList.criticalItem'),
         current_stock: 0,
         unit: "Units",
         consumption_history: []
