@@ -1,0 +1,277 @@
+{
+  "app": {
+    "title": "Creva Health",
+    "subtitle": "Federated Health Network",
+    "nav": {
+      "commandCenter": "Command Center",
+      "districts": "Districts",
+      "alerts": "Alerts",
+      "federated": "Federated Intelligence",
+      "brics": "BRICS Network",
+      "resourceResponse": "Resource Response"
+    },
+    "status": {
+      "allSystemsOperational": "All systems operational",
+      "emulatorSecure": "EMULATOR · SECURE"
+    },
+    "header": {
+      "title": "Tamil Nadu State Health Command Center",
+      "subtitle": "National Health Mission · Primary Health Centre Network",
+      "live": "Live",
+      "updated": "UPDATED:",
+      "filter": "FILTER:",
+      "allDistricts": "All Districts"
+    },
+    "error": {
+      "connection": "Unable to connect to local healthcare data.",
+      "notice": "Connection Notice:",
+      "retry": "Retry"
+    }
+  },
+  "dashboard": {
+    "loading": "LOADING COMMAND CENTER DATA...",
+    "noPhcNodes": {
+      "title": "No PHC Nodes Available",
+      "desc": "There are currently no Primary Health Centres in the selected filter view."
+    },
+    "kpi": {
+      "totalPhcs": "Total PHCs",
+      "criticalNodes": "Critical Nodes",
+      "atRiskNodes": "At-Risk Nodes",
+      "bedUtilization": "Bed Utilization",
+      "staffOnDuty": "Staff On-Duty",
+      "drugShortages": "Drug Shortages"
+    },
+    "recs": {
+      "title": "Recommended Resource Transfers",
+      "aiBadge": "AI Recommendation",
+      "subtitle": "AI-generated · Updated from Firestore",
+      "medicine": "Medicine",
+      "quantity": "Quantity",
+      "dispatchRoute": "Dispatch Route",
+      "units": "UNITS",
+      "approve": "Approve",
+      "approved": "✓ Approved"
+    },
+    "grid": {
+      "districtSuffix": "District",
+      "nodesSuffix": "Nodes",
+      "critical": "CRITICAL",
+      "warning": "WARNING",
+      "stable": "STABLE",
+      "stockOutToday": "STOCK-OUT TODAY",
+      "stockOutIn": "STOCK-OUT IN {days}d",
+      "beds": "Beds",
+      "staff": "Staff",
+      "stockProjections": "Stock Projections",
+      "stableDays": "Stable",
+      "tab": "Tab",
+      "bot": "Bot",
+      "viewFacilityComms": "View Facility Comms"
+    },
+    "risk": {
+      "title": "District Risk Index",
+      "subtitle": "Aggregated threat assessments",
+      "nodeSuffix": "Node"
+    },
+    "platformIntel": {
+      "title": "Platform Intel",
+      "desc": "Data aggregates hourly from secure edge PHC nodes. Model parameter transfers leverage MPC cryptography to verify state stocks."
+    }
+  },
+  "phcDetail": {
+    "loading": "LOADING PHC DETAIL READOUT...",
+    "back": "BACK TO COMMAND CENTER",
+    "phcNode": "PHC NODE:",
+    "facilityProfile": "Facility Profile",
+    "districtState": "{district} District · State of Tamil Nadu",
+    "gpsCoordinates": "GPS Coordinates",
+    "regionalOutpost": "Regional Outpost",
+    "zoneWest": "Zone 3 (West)",
+    "epidemicOutbreak": {
+      "title": "Active Epidemic Outbreak",
+      "desc": "High regional waterlogging has triggered acute dengue/malaria surges. Hospital bed occupancy and key medicine stocks are under critical stress."
+    },
+    "capacity": {
+      "title": "Capacity & Operations Readout",
+      "bedOccupancy": "Bed Occupancy",
+      "bedsOccupied": "/ {total} beds occupied",
+      "bedsRemaining": "{remaining} operational beds remaining.",
+      "staffAttendance": "Staff Attendance",
+      "activeStaff": "/ {total} active staff",
+      "staffOffline": "{offline} staff offline today."
+    },
+    "briefing": {
+      "title": "AI Situation Briefing",
+      "outpostStatus": "{med} (Outpost Status)"
+    },
+    "analytics": {
+      "title": "Epidemic Resource Analytics",
+      "subtitle": "Current stock versus 14-day local consumption history. Spike detection highlights uncharacteristic resource drain.",
+      "noRecords": "No medicine inventory records found for this Primary Health Centre.",
+      "status": {
+        "stockout": "STOCKOUT",
+        "criticalRisk": "CRITICAL RISK",
+        "lowStock": "LOW STOCK",
+        "optimal": "OPTIMAL"
+      },
+      "stock": "STOCK:",
+      "spike": "⚠️ SPIKE (+{percent}%)",
+      "stockOutPredictedIn": "⚠️ Stock-out predicted in {days}d",
+      "stockOutPredictedInStable": "Stock-out predicted in {days}",
+      "dengueCases": "Dengue cases: +{percent}% this week",
+      "malariaCases": "Malaria cases: +{percent}% this week",
+      "vertexLoading": "🤖 Vertex AI: Loading...",
+      "vertexPrediction": "🤖 Vertex AI Prediction: {days}",
+      "trainedLoading": "🤖 Trained Model: Loading...",
+      "trainedPrediction": "🤖 AI-Predicted Stock-out (Trained Model): {days}",
+      "demandRunRate": "14-Day Demand Run-Rate",
+      "requiredSafety": "REQUIRED SAFETY:",
+      "stable": "Stable",
+      "units": "UNITS",
+      "day": "day",
+      "days": "days"
+    }
+  },
+  "districtsSummary": {
+    "loading": "LOADING DISTRICT NODE SUMMARIES...",
+    "title": "District Node Summaries",
+    "subtitle": "Comparative overview of regional health district capacities and crisis assessments from Firestore.",
+    "noDistricts": "No health districts found in Firestore database.",
+    "districtRiskLevel": "District Risk Level",
+    "phcOutposts": "PHC Outposts",
+    "nodesSuffix": "Nodes",
+    "bedsCapacity": "Beds Capacity",
+    "staffAttendance": "Staff Attendance",
+    "medicinesAtRisk": "Medicines At-Risk",
+    "itemsSuffix": "items",
+    "openDistrictPanel": "Open District Panel"
+  },
+  "alertsList": {
+    "loading": "LOADING INVENTORY ALERTS...",
+    "title": "Active Inventory Alerts",
+    "subtitle": "Real-time depletion alerts computed via linear regression on local daily run-rates from Firestore.",
+    "noAlerts": {
+      "title": "No Active Resource Alerts",
+      "desc": "All Primary Health Centre nodes are operating with sufficient inventory buffers."
+    },
+    "th": {
+      "phc": "Primary Health Centre",
+      "district": "District",
+      "medicine": "Medicine Item",
+      "currentStock": "Current Stock",
+      "runRateTrend": "Run-Rate Trend",
+      "status": "Status"
+    },
+    "stockOutToday": "STOCK-OUT TODAY",
+    "stockOutIn": "STOCK-OUT IN {days}d",
+    "unitsPerDay": "units/day"
+  },
+  "federated": {
+    "loading": "LOADING FEDERATED NETWORK MODEL PARAMETERS...",
+    "title": "Federated Intelligence",
+    "subtitle": "Collaborative machine learning for state-wide resource forecasting. Participating nodes contribute model updates while raw health data remains local.",
+    "meta": {
+      "globalModel": "Global Model",
+      "globalModelVal": "FedAvg Tabular Regressor v1",
+      "trainingRound": "Training Round",
+      "trainingRoundVal": "Round 10 (Averaged)",
+      "participatingNodes": "Participating Nodes",
+      "participatingNodesVal": "3 Districts Node Cluster",
+      "aggregationMethod": "Aggregation Method",
+      "modelStatus": "Model Status",
+      "active": "ACTIVE"
+    },
+    "flow": {
+      "title": "Live Aggregation Data-Flow Simulation",
+      "globalTrend": "GLOBAL TREND:"
+    },
+    "node": {
+      "salem": "Salem Node",
+      "namakkal": "Namakkal Node",
+      "erode": "Erode Node",
+      "online": "Online",
+      "status": "Status:",
+      "localTrend": "Local Trend:",
+      "protected": "P2P DATA: PROTECTED"
+    },
+    "agg": {
+      "active": "Active",
+      "params": "Aggregation Parameters",
+      "statePrediction": "Aggregated State Prediction",
+      "riskConfirmed": "⚠️ Collaborative Outbreak Risk Confirmed",
+      "riskDesc": "Aggregate regression models confirm an escalating slope mismatch. Namakkal region is identified as the outbreak epicentre (Severe deficit slope ≥ 11.5). Salem & Erode are verified as stable surplus buffers."
+    },
+    "history": {
+      "title": "Federated Optimization History",
+      "subtitle": "Model training error (Mean Squared Error) across rounds of Federated Averaging.",
+      "salemClient": "Salem Client",
+      "erodeClient": "Erode Client",
+      "namakkalClient": "Namakkal Client",
+      "globalModel": "Global Aggregate Model",
+      "caption": "Live training results: 10 rounds of federated averaging across 3 districts."
+    },
+    "privacy": {
+      "title": "Privacy-First Aggregation",
+      "desc": "Each district trains locally on its own data. Only model insights — not raw patient or stock data — are shared with the central aggregator, preserving privacy while improving predictions for everyone."
+    },
+    "howItWorks": {
+      "title": "How it works",
+      "step1Title": "Local Training:",
+      "step1Desc": "Salem, Erode, and Namakkal run independent linear regressions locally inside their nodes using their specific PHC inventories.",
+      "step2Title": "Parameters Sharing:",
+      "step2Desc": "The district nodes transmit only computed trend coefficients (slope slopes, intercept weights) to the central aggregator.",
+      "step3Title": "Global Aggregation:",
+      "step3Desc": "The central node performs federated aggregation, calculating a unified state-wide resource allocation projection."
+    }
+  },
+  "brics": {
+    "loading": "LOADING BRICS FEDERATION NODES...",
+    "title": "BRICS Global Federation Network",
+    "subtitle": "International federated model parameters sharing for pandemic response and outbreak preparedness.",
+    "nodes": {
+      "title": "Global Aggregate Model Nodes",
+      "subtitle": "Select an active national server node to view global parameter exchange rates. Currently, the India central aggregator is active and feeding local state parameters.",
+      "noNodes": "No active national server nodes found in Firestore database.",
+      "prototypeNode": "● PROTOTYPE NODE",
+      "futureVision": "FUTURE VISION"
+    },
+    "policy": {
+      "title": "Federated Scope & Policy",
+      "desc": "The same state-level federated aggregation pattern extends to a BRICS-level aggregator, allowing nations to share predictive intelligence for pandemic/outbreak preparedness without exposing raw health data across borders.",
+      "rulesTitle": "AGGREGATION RULES",
+      "rule1": "1. Local patient records never leave national borders.",
+      "rule2": "2. Aggregated trend slopes are merged via secure multi-party computation (SMPC).",
+      "rule3": "3. Dynamic forecasting updates occur under official health ministries."
+    }
+  },
+  "pipeline": {
+    "title": "AI Decision-Support Pipeline",
+    "diagnostics": "Optimization diagnostics for {med}",
+    "step1": "Step 1: Current Stock & Demand",
+    "currentStock": "Current Stock",
+    "safetyTarget": "safety target: {target}",
+    "dailyRunRate": "Daily Run Rate",
+    "unitsPerDay": "units / day",
+    "step2": "Step 2: Stockout Forecast & Risk",
+    "linearForecast": "AI Forecast (Linear)",
+    "trainedForecast": "Neural Net (Trained)",
+    "vertexForecast": "Vertex AI Endpoint",
+    "riskLevel": "Calculated Risk Level",
+    "loading": "Loading...",
+    "stable": "Stable",
+    "notAvailable": "N/A",
+    "step3": "Step 3: P2P Redistribution Recommendation",
+    "opportunityFound": "Redistribution Opportunity Found",
+    "transferUnits": "Transfer {quantity} units from {from} ({distance} km away). Safety reserves of donor outpost are verified protected.",
+    "approve": "Approve Transfer",
+    "approving": "Processing Approval...",
+    "approved": "Transfer Approved ✓",
+    "noRedistribution": "No redistribution required. Current stockout timeline is outside the emergency threshold (≥ 7 days).",
+    "noDonor": "No donor source available. All neighboring healthcare outposts are below their required minimum safety reserves.",
+    "step4": "Step 4: AI Situation Briefing",
+    "explainability": "Gemini Explainability",
+    "briefingUnavailable": "AI briefing temporarily unavailable. Core prediction and redistribution analysis are still available.",
+    "selectMed": "Select a medicine card to load the AI pipeline."
+  }
+}

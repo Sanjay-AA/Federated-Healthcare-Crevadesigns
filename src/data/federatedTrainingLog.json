@@ -1,0 +1,72 @@
+[
+  {
+    "round": 1,
+    "Salem": 164.288,
+    "Erode": 172.3964,
+    "Namakkal": 27.1457,
+    "Global": 121.4605
+  },
+  {
+    "round": 2,
+    "Salem": 157.901,
+    "Erode": 165.9499,
+    "Namakkal": 22.4666,
+    "Global": 115.6125
+  },
+  {
+    "round": 3,
+    "Salem": 144.1057,
+    "Erode": 151.8232,
+    "Namakkal": 17.4031,
+    "Global": 105.4842
+  },
+  {
+    "round": 4,
+    "Salem": 117.8345,
+    "Erode": 124.3536,
+    "Namakkal": 11.9963,
+    "Global": 87.3525
+  },
+  {
+    "round": 5,
+    "Salem": 74.1451,
+    "Erode": 78.0177,
+    "Namakkal": 6.4862,
+    "Global": 57.6072
+  },
+  {
+    "round": 6,
+    "Salem": 31.1107,
+    "Erode": 33.4131,
+    "Namakkal": 2.4345,
+    "Global": 26.487
+  },
+  {
+    "round": 7,
+    "Salem": 8.9095,
+    "Erode": 9.3577,
+    "Namakkal": 1.0264,
+    "Global": 9.0294
+  },
+  {
+    "round": 8,
+    "Salem": 2.6962,
+    "Erode": 3.0228,
+    "Namakkal": 0.6432,
+    "Global": 3.5765
+  },
+  {
+    "round": 9,
+    "Salem": 1.9211,
+    "Erode": 1.9768,
+    "Namakkal": 0.5702,
+    "Global": 2.342
+  },
+  {
+    "round": 10,
+    "Salem": 1.7142,
+    "Erode": 1.7269,
+    "Namakkal": 0.533,
+    "Global": 1.9307
+  }
+]

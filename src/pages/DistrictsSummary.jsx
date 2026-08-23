@@ -1,6 +1,7 @@
 import React from 'react';
-import { mockMedicines } from '../data/mockMedicines';
+
 import { predictDaysToStockOut, calculateDistrictRisk } from '../lib/forecast';
+import { useLanguage } from '../i18n/LanguageContext';
 
 export default function DistrictsSummary({ 
   phcs = [], 
@@ -11,6 +12,8 @@ export default function DistrictsSummary({
   loading = false, 
   onSelectDistrict 
 }) {
+  const { t } = useLanguage();
+
   if (loading) {
     return (
       <div className="flex items-center justify-center p-16 text-[#64748B] text-xs font-semibold space-x-3 animate-fadeIn">
@@ -18,12 +21,12 @@ export default function DistrictsSummary({
           <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
           <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z"></path>
         </svg>
-        <span>LOADING DISTRICT NODE SUMMARIES...</span>
+        <span>{t('districtsSummary.loading')}</span>
       </div>
     );
   }
 
-  const activeMedsSource = medicines && medicines.length > 0 ? medicines : mockMedicines;
+  const activeMedsSource = medicines || [];
   
   // Extract district list from Firestore or fallback
   const districtList = districts.length > 0
@@ -76,37 +79,37 @@ export default function DistrictsSummary({
   if (districtList.length === 0) {
     return (
       <div className="bg-white border border-[#E2E8F0] rounded-lg p-12 text-center text-xs text-[#64748B] animate-fadeIn">
-        No health districts found in Firestore database.
+        {t('districtsSummary.noDistricts')}
       </div>
     );
   }
 
   return (
-    <div className="space-y-6 animate-fadeIn">
+    <div className="space-y-5 animate-fadeIn">
       {/* Header */}
-      <div className="pb-5 border-b border-[#E2E8F0]">
-        <h1 className="text-xl font-heading font-semibold text-[#1D4E89]">
-          District Node Summaries
+      <div className="pb-3 border-b border-[#E2E8F0]">
+        <h1 className="text-xl font-sans font-semibold text-[#0F172A]">
+          {t('districtsSummary.title')}
         </h1>
         <p className="text-xs text-[#64748B] mt-1">
-          Comparative overview of regional health district capacities and crisis assessments from Firestore.
+          {t('districtsSummary.subtitle')}
         </p>
       </div>
 
       {/* Grid */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
         {districtList.map((dName) => {
           const m = getDistrictMetrics(dName);
           return (
             <div 
               key={dName} 
-              className="bg-white border border-[#E2E8F0] rounded-lg p-6 space-y-6 flex flex-col justify-between"
+              className="bg-white border border-[#E2E8F0] rounded-[8px] p-4 space-y-4 flex flex-col justify-between"
             >
               {/* Header */}
               <div className="space-y-1">
                 <div className="flex items-center justify-between">
-                  <h3 className="font-heading font-bold text-[#1E293B] text-base">{dName} District</h3>
-                  <span className={`text-[9px] font-bold px-2 py-0.5 rounded border ${m.riskColor}`}>
+                  <h3 className="font-sans font-semibold text-[#0F172A] text-sm">{dName} {t('dashboard.grid.districtSuffix')}</h3>
+                  <span className={`text-[9px] font-bold px-1.5 py-0.2 rounded border ${m.riskColor}`}>
                     {m.riskLevel}
                   </span>
                 </div>
@@ -114,14 +117,14 @@ export default function DistrictsSummary({
               </div>
 
               {/* Combined Metrics */}
-              <div className="space-y-4">
+              <div className="space-y-3">
                 {/* Risk Slider Bar */}
                 <div className="space-y-1">
                   <div className="flex justify-between text-xs">
-                    <span className="text-[#64748B] font-medium">District Risk Level</span>
+                    <span className="text-[#64748B] font-medium">{t('districtsSummary.districtRiskLevel')}</span>
                     <span className="font-mono font-semibold text-[#1E293B]">{m.riskPercentage}%</span>
                   </div>
-                  <div className="h-2 w-full bg-[#E2E8F0] rounded-full relative overflow-hidden">
+                  <div className="h-1 w-full bg-[#E2E8F0] rounded-full overflow-hidden">
                     <div 
                       className={`h-full rounded-full ${
                         dName === 'Namakkal' ? 'bg-[#D64545]' : 'bg-[#0F6B66]'
@@ -132,27 +135,27 @@ export default function DistrictsSummary({
                 </div>
 
                 {/* Details Table */}
-                <div className="space-y-2.5 pt-2 border-t border-[#E2E8F0] text-xs">
+                <div className="space-y-1.5 pt-2 border-t border-[#E2E8F0] text-xs">
                   <div className="flex justify-between">
-                    <span className="text-[#64748B] font-medium">PHC Outposts</span>
-                    <span className="font-mono font-semibold text-[#1E293B]">{m.totalPhcs} Nodes</span>
+                    <span className="text-[#64748B] font-medium">{t('districtsSummary.phcOutposts')}</span>
+                    <span className="font-mono font-semibold text-[#1E293B]">{m.totalPhcs} {t('districtsSummary.nodesSuffix')}</span>
                   </div>
                   <div className="flex justify-between">
-                    <span className="text-[#64748B] font-medium">Beds Capacity</span>
+                    <span className="text-[#64748B] font-medium">{t('districtsSummary.bedsCapacity')}</span>
                     <span className="font-mono text-[#1E293B]">
                       {m.occupiedBeds}/{m.totalBeds} <span className="text-[#64748B]">({m.bedOccupancyRate}%)</span>
                     </span>
                   </div>
                   <div className="flex justify-between">
-                    <span className="text-[#64748B] font-medium">Staff Attendance</span>
+                    <span className="text-[#64748B] font-medium">{t('districtsSummary.staffAttendance')}</span>
                     <span className="font-mono text-[#1E293B]">
                       {m.staffPresent}/{m.totalStaff} <span className="text-[#64748B]">({m.staffAttendanceRate}%)</span>
                     </span>
                   </div>
                   <div className="flex justify-between">
-                    <span className="text-[#64748B] font-medium">Medicines At-Risk</span>
+                    <span className="text-[#64748B] font-medium">{t('districtsSummary.medicinesAtRisk')}</span>
                     <span className={`font-mono font-semibold ${m.atRiskMedsCount > 0 ? 'text-[#D64545]' : 'text-[#0F6B66]'}`}>
-                      {m.atRiskMedsCount} items
+                      {m.atRiskMedsCount} {t('districtsSummary.itemsSuffix')}
                     </span>
                   </div>
                 </div>
@@ -161,9 +164,9 @@ export default function DistrictsSummary({
               {/* Action Button */}
               <button
                 onClick={() => onSelectDistrict(dName)}
-                className="w-full py-2 bg-[#1D4E89] hover:bg-[#153B68] text-white text-xs font-semibold uppercase tracking-wider rounded transition-colors cursor-pointer select-none"
+                className="w-full py-1.5 bg-[#0F172A] hover:bg-slate-800 text-white text-xs font-medium rounded-[6px] transition-colors cursor-pointer select-none"
               >
-                Open District Panel
+                {t('districtsSummary.openDistrictPanel')}
               </button>
             </div>
           );

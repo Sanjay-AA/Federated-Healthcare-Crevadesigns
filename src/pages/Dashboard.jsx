@@ -1,7 +1,8 @@
 import React, { useState } from 'react';
-import { mockMedicines } from '../data/mockMedicines';
+
 import { predictDaysToStockOut, calculateDistrictRisk } from '../lib/forecast';
 import { getRedistributionRecommendation } from '../lib/redistribution';
+import { useLanguage } from '../i18n/LanguageContext';
 
 export default function Dashboard({ 
   phcs = [], 
@@ -12,15 +13,17 @@ export default function Dashboard({
   federatedModel = null, 
   loading = false, 
   onSelectPhc, 
-  districtFilter 
+  districtFilter,
+  onSimulateResponse
 }) {
+  const { t } = useLanguage();
   const [dispatchedRecs, setDispatchedRecs] = useState({});
 
   const districtList = districts && districts.length > 0
     ? districts.map(d => d.name)
     : Array.from(new Set(['Namakkal', 'Salem', 'Erode', ...phcs.map(p => p.district)]));
 
-  const activeMeds = medicines && medicines.length > 0 ? medicines : mockMedicines;
+  const activeMeds = medicines || [];
 
   const getStatus = (occupied, total, phcMeds) => {
     const occupancyRate = total > 0 ? occupied / total : 0;
@@ -33,7 +36,8 @@ export default function Dashboard({
       return { 
         dot: 'bg-[#D64545]', 
         text: 'text-[#D64545]', 
-        label: 'CRITICAL', 
+        code: 'CRITICAL',
+        label: t('dashboard.grid.critical'), 
         barBg: 'bg-[#D64545]' 
       };
     }
@@ -41,14 +45,16 @@ export default function Dashboard({
       return { 
         dot: 'bg-[#E8A33D]', 
         text: 'text-[#E8A33D]', 
-        label: 'WARNING', 
+        code: 'WARNING',
+        label: t('dashboard.grid.warning'), 
         barBg: 'bg-[#E8A33D]' 
       };
     }
     return { 
       dot: 'bg-[#0F6B66]', 
       text: 'text-[#0F6B66]', 
-      label: 'STABLE', 
+      code: 'STABLE',
+      label: t('dashboard.grid.stable'), 
       barBg: 'bg-[#0F6B66]' 
     };
   };
@@ -70,7 +76,7 @@ export default function Dashboard({
           <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
           <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z"></path>
         </svg>
-        <span>LOADING COMMAND CENTER DATA...</span>
+        <span>{t('dashboard.loading')}</span>
       </div>
     );
   }
@@ -90,8 +96,8 @@ export default function Dashboard({
     const phcMeds = activeMeds.filter(m => m.phc_id === phc.id);
     const status = getStatus(phc.occupied_beds, phc.total_beds, phcMeds);
     
-    if (status.label === 'CRITICAL') criticalCount++;
-    else if (status.label === 'WARNING') atRiskCount++;
+    if (status.code === 'CRITICAL') criticalCount++;
+    else if (status.code === 'WARNING') atRiskCount++;
 
     totalBeds += phc.total_beds;
     occupiedBeds += phc.occupied_beds;
@@ -125,16 +131,16 @@ export default function Dashboard({
 
   // Fallback to Firestore transfers if available and no recommendations generated
   if (allRecommendations.length === 0 && transfers.length > 0) {
-    transfers.forEach((t) => {
-      const fromPhc = phcs.find(p => p.id === t.from_phc_id);
-      const toPhc = phcs.find(p => p.id === t.to_phc_id);
+    transfers.forEach((tDoc) => {
+      const fromPhc = phcs.find(p => p.id === tDoc.from_phc_id);
+      const toPhc = phcs.find(p => p.id === tDoc.to_phc_id);
       if (fromPhc && toPhc) {
         allRecommendations.push({
           from_phc: fromPhc,
           to_phc: toPhc,
-          medicine: t.medicine_name || t.medicine_id,
-          quantity: t.quantity,
-          distance_km: t.distance_km
+          medicine: tDoc.medicine_name || tDoc.medicine_id,
+          quantity: tDoc.quantity,
+          distance_km: tDoc.distance_km
         });
       }
     });
@@ -146,8 +152,8 @@ export default function Dashboard({
         <svg className="w-8 h-8 text-slate-300 mx-auto mb-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
         </svg>
-        <p className="font-semibold text-slate-700">No PHC Nodes Available</p>
-        <p className="mt-1 text-slate-500">There are currently no Primary Health Centres in the selected filter view.</p>
+        <p className="font-semibold text-slate-700">{t('dashboard.noPhcNodes.title')}</p>
+        <p className="mt-1 text-slate-500">{t('dashboard.noPhcNodes.desc')}</p>
       </div>
     );
   }
@@ -156,52 +162,88 @@ export default function Dashboard({
     <div className="grid grid-cols-1 xl:grid-cols-4 gap-6 items-start animate-fadeIn">
       
       {/* LEFT COLUMN: MAIN WORKSPACE (KPIs, Recommendations, PHC Grids) */}
-      <div className="xl:col-span-3 space-y-6">
+      <div className="xl:col-span-3 space-y-5">
         
+        {/* Critical Operations Alert Banner */}
+        {criticalCount > 0 && (
+          <div className="bg-[#D64545]/10 border border-[#D64545]/20 rounded-[8px] p-3 px-4 flex items-center justify-between gap-3 text-xs">
+            <div className="flex items-center gap-2 text-[#D64545]">
+              <span className="font-bold flex items-center gap-1.5 uppercase text-[11px] tracking-wide shrink-0">
+                <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                </svg>
+                Critical Alert
+              </span>
+              <span className="text-[#0F172A] font-medium hidden sm:inline">
+                {criticalCount} facility node(s) currently experiencing severe stockout or capacity pressure.
+              </span>
+            </div>
+            <div className="flex items-center gap-2">
+              <span className="text-[10px] font-mono font-bold text-[#D64545] bg-[#D64545]/10 px-2 py-0.5 rounded border border-[#D64545]/20 hidden md:inline">
+                ATTENTION REQUIRED
+              </span>
+              <button
+                onClick={() => {
+                  const firstCritPhc = phcs.find(p => {
+                    const pMeds = medicines.filter(m => m.phc_id === p.id);
+                    const status = getStatus(p.occupied_beds, p.total_beds, pMeds);
+                    return status.code === 'CRITICAL';
+                  });
+                  const critMed = firstCritPhc ? medicines.find(m => m.phc_id === firstCritPhc.id && predictDaysToStockOut(m.consumption_history, m.current_stock) < 3) : null;
+                  onSimulateResponse(firstCritPhc, critMed);
+                }}
+                className="px-2.5 py-1 bg-[#D64545] text-white rounded font-bold text-[10px] hover:bg-red-750 cursor-pointer select-none transition-colors"
+              >
+                Simulate Response →
+              </button>
+            </div>
+          </div>
+        )}
+
         {/* A. DYNAMIC KPI ROW */}
-        <div className="bg-white border border-slate-200 rounded-lg p-4 grid grid-cols-2 md:grid-cols-3 xl:grid-cols-6 gap-4">
-          <div className="text-center md:text-left border-r border-slate-100/80 pr-2">
-            <span className="text-[10px] font-semibold text-[#64748B] uppercase tracking-wider">Total PHCs</span>
-            <div className="font-mono text-xl font-semibold text-[#0F172A] mt-1">{totalPhcs}</div>
+        <div className="bg-white border border-[#E2E8F0] rounded-[8px] p-3.5 px-4 grid grid-cols-2 sm:grid-cols-3 xl:grid-cols-6 gap-3 shadow-xs">
+          <div className="text-left border-r border-[#E2E8F0] pr-2">
+            <span className="text-[10px] font-bold text-[#64748B] uppercase tracking-wider block">{t('dashboard.kpi.totalPhcs')}</span>
+            <div className="font-sans text-lg font-bold text-[#0F172A] mt-0.5">{totalPhcs}</div>
           </div>
-          <div className="text-center md:text-left border-r border-slate-100/80 pr-2">
-            <span className="text-[10px] font-semibold text-[#64748B] uppercase tracking-wider">Critical Nodes</span>
-            <div className="font-mono text-xl font-semibold text-[#D64545] mt-1">{criticalCount}</div>
+          <div className="text-left border-r border-[#E2E8F0] pr-2">
+            <span className="text-[10px] font-bold text-[#64748B] uppercase tracking-wider block">{t('dashboard.kpi.criticalNodes')}</span>
+            <div className="font-sans text-lg font-bold text-[#D64545] mt-0.5">{criticalCount}</div>
           </div>
-          <div className="text-center md:text-left border-r border-slate-100/80 pr-2">
-            <span className="text-[10px] font-semibold text-[#64748B] uppercase tracking-wider">At-Risk Nodes</span>
-            <div className="font-mono text-xl font-semibold text-[#E8A33D] mt-1">{atRiskCount}</div>
+          <div className="text-left border-r border-[#E2E8F0] pr-2">
+            <span className="text-[10px] font-bold text-[#64748B] uppercase tracking-wider block">{t('dashboard.kpi.atRiskNodes')}</span>
+            <div className="font-sans text-lg font-bold text-[#E8A33D] mt-0.5">{atRiskCount}</div>
           </div>
-          <div className="text-center md:text-left border-r border-slate-100/80 pr-2">
-            <span className="text-[10px] font-semibold text-[#64748B] uppercase tracking-wider">Bed Utilization</span>
-            <div className="font-mono text-xl font-semibold text-[#0F172A] mt-1">{bedUtilization}%</div>
+          <div className="text-left border-r border-[#E2E8F0] pr-2">
+            <span className="text-[10px] font-bold text-[#64748B] uppercase tracking-wider block">{t('dashboard.kpi.bedUtilization')}</span>
+            <div className="font-sans text-lg font-bold text-[#0F172A] mt-0.5">{bedUtilization}%</div>
           </div>
-          <div className="text-center md:text-left border-r border-slate-100/80 pr-2">
-            <span className="text-[10px] font-semibold text-[#64748B] uppercase tracking-wider">Staff On-Duty</span>
-            <div className="font-mono text-xl font-semibold text-[#0F172A] mt-1">{staffAvailability}%</div>
+          <div className="text-left border-r border-[#E2E8F0] pr-2">
+            <span className="text-[10px] font-bold text-[#64748B] uppercase tracking-wider block">{t('dashboard.kpi.staffOnDuty')}</span>
+            <div className="font-sans text-lg font-bold text-[#0F172A] mt-0.5">{staffAvailability}%</div>
           </div>
-          <div className="text-center md:text-left pr-2">
-            <span className="text-[10px] font-semibold text-[#64748B] uppercase tracking-wider">Drug Shortages</span>
-            <div className="font-mono text-xl font-semibold text-[#D64545] mt-1">{medicineShortages}</div>
+          <div className="text-left pr-1">
+            <span className="text-[10px] font-bold text-[#64748B] uppercase tracking-wider block">{t('dashboard.kpi.drugShortages')}</span>
+            <div className="font-sans text-lg font-bold text-[#D64545] mt-0.5">{medicineShortages}</div>
           </div>
         </div>
 
         {/* B. P2P RECOMMENDATIONS PANEL */}
         {allRecommendations.length > 0 && (
-          <div className="bg-white border border-slate-200 rounded-lg p-5 space-y-4">
+          <div className="bg-white border border-[#E2E8F0] rounded-[8px] p-4 space-y-3">
             <div>
               <div className="flex items-center gap-2">
-                <h3 className="text-xs font-semibold text-[#1D4E89] uppercase tracking-wider">
-                  Recommended Resource Transfers
+                <h3 className="text-xs font-semibold text-[#0F172A] uppercase tracking-wider">
+                  {t('dashboard.recs.title')}
                 </h3>
-                <span className="text-[9px] font-semibold text-indigo-500 bg-indigo-50 border border-indigo-100 px-1.5 py-0.5 rounded uppercase tracking-wider">
-                  AI Recommendation
+                <span className="text-[9px] font-semibold text-blue-600 bg-blue-50 border border-blue-150/70 px-1.5 py-0.5 rounded-[4px] uppercase tracking-wider">
+                  {t('dashboard.recs.aiBadge')}
                 </span>
               </div>
-              <p className="text-[11px] text-[#64748B] mt-0.5">AI-generated · Updated from Firestore</p>
+              <p className="text-[10px] text-[#64748B] mt-0.5">{t('dashboard.recs.subtitle')}</p>
             </div>
 
-            <div className="divide-y divide-slate-100 border border-slate-100 rounded">
+            <div className="divide-y divide-slate-100 border border-[#E2E8F0] rounded-[6px] overflow-hidden">
               {allRecommendations.map((rec, idx) => {
                 const recKey = `${rec.from_phc.id}-${rec.to_phc.id}-${rec.medicine}`;
                 const isDispatched = dispatchedRecs[recKey];
@@ -209,21 +251,21 @@ export default function Dashboard({
                 return (
                   <div 
                     key={idx} 
-                    className="p-4 flex flex-col md:flex-row md:items-center justify-between gap-4 bg-[#FDFDFD] hover:bg-[#F8FAFC] transition-colors"
+                    className="p-3 flex flex-col md:flex-row md:items-center justify-between gap-3 bg-[#FDFDFD] hover:bg-[#F8FAFC] transition-colors"
                   >
                     {/* Left: Info Grid */}
-                    <div className="grid grid-cols-2 md:grid-cols-4 gap-4 items-center flex-1">
+                    <div className="grid grid-cols-2 md:grid-cols-4 gap-2 items-center flex-1 text-xs">
                       <div>
-                        <span className="text-[9px] text-[#64748B] font-semibold tracking-wider uppercase block">Medicine</span>
-                        <span className="text-xs font-bold text-[#0F172A] font-heading">{rec.medicine.toUpperCase()}</span>
+                        <span className="text-[9px] text-[#64748B] font-semibold tracking-wider uppercase block">{t('dashboard.recs.medicine')}</span>
+                        <span className="font-semibold text-[#0F172A]">{rec.medicine}</span>
                       </div>
                       <div>
-                        <span className="text-[9px] text-[#64748B] font-semibold tracking-wider uppercase block">Quantity</span>
-                        <span className="text-xs font-mono font-bold text-[#1D4E89]">{rec.quantity} UNITS</span>
+                        <span className="text-[9px] text-[#64748B] font-semibold tracking-wider uppercase block">{t('dashboard.recs.quantity')}</span>
+                        <span className="font-mono font-semibold text-[#0F172A]">{rec.quantity} {t('dashboard.recs.units')}</span>
                       </div>
                       <div className="col-span-2">
-                        <span className="text-[9px] text-[#64748B] font-semibold tracking-wider uppercase block">Dispatch Route</span>
-                        <span className="text-xs text-[#0F172A] font-medium leading-none">
+                        <span className="text-[9px] text-[#64748B] font-semibold tracking-wider uppercase block">{t('dashboard.recs.dispatchRoute')}</span>
+                        <span className="text-[#0F172A] font-medium leading-none">
                           {rec.from_phc.name} <span className="text-[#64748B]">→</span> {rec.to_phc.name}
                         </span>
                         <span className="text-[10px] text-[#64748B] font-mono block mt-0.5">({rec.distance_km} km)</span>
@@ -232,13 +274,13 @@ export default function Dashboard({
                     {/* Right: Approve action */}
                     <button
                       onClick={() => setDispatchedRecs(prev => ({ ...prev, [recKey]: !prev[recKey] }))}
-                      className={`h-9 px-4 rounded text-xs font-semibold tracking-wider border select-none cursor-pointer transition-colors ${
+                      className={`h-8 px-3 rounded-[6px] text-xs font-medium tracking-wider border select-none cursor-pointer transition-colors ${
                         isDispatched 
-                          ? 'bg-[#0F6B66]/10 border-[#0F6B66]/20 text-[#0F6B66]' 
-                          : 'bg-[#1D4E89] border-[#1D4E89] text-white hover:bg-[#153B68]'
+                          ? 'bg-emerald-50 border-emerald-250 text-emerald-700' 
+                          : 'bg-[#0F172A] border-[#0F172A] text-white hover:bg-slate-800'
                       }`}
                     >
-                      {isDispatched ? '✓ Approved' : 'Approve'}
+                      {isDispatched ? t('dashboard.recs.approved') : t('dashboard.recs.approve')}
                     </button>
                   </div>
                 );
@@ -258,10 +300,10 @@ export default function Dashboard({
                 {/* District Section Title */}
                 <div className="flex items-center gap-3">
                   <h2 className="text-xs font-bold text-[#1D4E89] tracking-wider uppercase font-heading">
-                    {districtName} District
+                    {districtName} {t('dashboard.grid.districtSuffix')}
                   </h2>
                   <span className="px-2 py-0.5 text-[9px] font-semibold rounded bg-[#F0F5FA] text-[#1D4E89] border border-[#E2E8F0] font-mono">
-                    {districtPhcs.length} Nodes
+                    {districtPhcs.length} {t('dashboard.grid.nodesSuffix')}
                   </span>
                   <div className="h-px bg-slate-200 flex-1 ml-2"></div>
                 </div>
@@ -274,7 +316,7 @@ export default function Dashboard({
                     const occupancyRate = phc.total_beds > 0 ? Math.round((phc.occupied_beds / phc.total_beds) * 100) : 0;
                     const staffRate = phc.total_staff > 0 ? Math.round((phc.staff_present_today / phc.total_staff) * 100) : 0;
                     
-                    const isCritical = status.label === 'CRITICAL';
+                    const isCritical = status.code === 'CRITICAL';
 
                     // Get detailed stockout predictions for card display
                     const medPara = phcMeds.find(m => m.name === 'Paracetamol');
@@ -290,48 +332,46 @@ export default function Dashboard({
                       <div
                         key={phc.id}
                         onClick={() => onSelectPhc(phc)}
-                        className={`group bg-white border rounded-lg p-5 flex flex-col justify-between hover:bg-[#F8FAFC] transition-colors cursor-pointer ${
+                        className={`group bg-white border rounded-[8px] p-4 flex flex-col justify-between hover:border-slate-300 transition-colors cursor-pointer ${
                           isCritical 
-                            ? 'border-l-4 border-l-[#D64545] border-slate-200' 
-                            : 'border-slate-200 hover:border-slate-350'
+                            ? 'border-l-2 border-l-[#D64545] border-slate-200' 
+                            : 'border-slate-200'
                         }`}
                       >
                         {/* Header Details */}
                         <div className="space-y-1">
-                          <div className="flex justify-between items-start gap-2">
-                            <h3 className="font-heading font-semibold text-[#0F172A] group-hover:text-[#1D4E89] text-[15px] transition-colors line-clamp-1">
+                          <div className="flex justify-between items-start gap-1">
+                            <h3 className="font-sans font-semibold text-[#0F172A] text-[13px] group-hover:text-[#1D4E89] transition-colors line-clamp-1">
                               {phc.name}
                             </h3>
                           </div>
-                          <div className="flex items-center justify-between text-xs text-[#64748B]">
-                            <span>TN / {phc.district}</span>
-                            <span className="flex items-center gap-1.5 font-bold text-[10px] tracking-wider">
+                          <div className="flex items-center justify-between text-[11px] text-[#64748B]">
+                            <span>{phc.district} {t('dashboard.grid.districtSuffix')}</span>
+                            <span className="flex items-center gap-1 font-bold text-[9px] tracking-wider">
                               <span className={`h-1.5 w-1.5 rounded-full ${status.dot}`}></span>
                               <span className={status.text}>{status.label}</span>
                             </span>
                           </div>
                           {minDays < 7 && (
-                            <span className={`inline-block font-mono text-[9px] font-bold px-1.5 py-0.5 rounded border mt-1 select-none ${
+                            <span className={`inline-block font-mono text-[9px] font-bold px-1.5 py-0.5 rounded border mt-0.5 select-none ${
                               minDays < 3 
                                 ? 'bg-[#D64545]/10 border-[#D64545]/20 text-[#D64545] animate-pulse' 
                                 : 'bg-[#E8A33D]/10 border-[#E8A33D]/20 text-[#E8A33D]'
                             }`}>
-                              {minDays === 0 ? 'STOCK-OUT TODAY' : `STOCK-OUT IN ${minDays} ${minDays === 1 ? 'DAY' : 'DAYS'}`}
+                              {minDays === 0 ? t('dashboard.grid.stockOutToday') : t('dashboard.grid.stockOutIn', { days: minDays })}
                             </span>
                           )}
                         </div>
 
-                        {/* Bed and Staff metrics */}
-                        <div className="my-4 space-y-3 pt-3 border-t border-slate-100">
+                        {/* Bed and Staff metrics inline */}
+                        <div className="my-3 space-y-2 pt-2 border-t border-slate-100 text-[11px]">
                           {/* Bed occupancy */}
-                          <div className="space-y-1">
-                            <div className="flex justify-between text-xs">
-                              <span className="text-[#64748B] font-medium text-[10px] uppercase tracking-wider">Bed Occupancy</span>
-                              <span className="font-mono text-[#0F172A]">
-                                {phc.occupied_beds}/{phc.total_beds} <span className={`font-semibold ${occupancyRate >= 85 ? 'text-[#D64545]' : 'text-[#64748B]'}`}>({occupancyRate}%)</span>
-                              </span>
+                          <div className="flex items-center justify-between">
+                            <div className="flex items-center gap-1">
+                              <span className="text-[#64748B] text-[9px] uppercase tracking-wider">{t('dashboard.grid.beds')}</span>
+                              <span className="font-medium text-[#0F172A]">{phc.occupied_beds}/{phc.total_beds}</span>
                             </div>
-                            <div className="h-1 w-full bg-slate-100 rounded-full overflow-hidden">
+                            <div className="w-20 h-1 bg-slate-100 rounded-full overflow-hidden">
                               <div 
                                 className={`h-full rounded-full transition-all duration-500 ${status.barBg}`} 
                                 style={{ width: `${occupancyRate}%` }}
@@ -340,14 +380,12 @@ export default function Dashboard({
                           </div>
 
                           {/* Staff availability */}
-                          <div className="space-y-1">
-                            <div className="flex justify-between text-xs">
-                              <span className="text-[#64748B] font-medium text-[10px] uppercase tracking-wider">Staff Attendance</span>
-                              <span className="font-mono text-[#0F172A]">
-                                {phc.staff_present_today}/{phc.total_staff} <span className="text-[#64748B]">({staffRate}%)</span>
-                              </span>
+                          <div className="flex items-center justify-between">
+                            <div className="flex items-center gap-1">
+                              <span className="text-[#64748B] text-[9px] uppercase tracking-wider">{t('dashboard.grid.staff')}</span>
+                              <span className="font-medium text-[#0F172A]">{phc.staff_present_today}/{phc.total_staff}</span>
                             </div>
-                            <div className="h-1 w-full bg-slate-100 rounded-full overflow-hidden">
+                            <div className="w-20 h-1 bg-slate-100 rounded-full overflow-hidden">
                               <div 
                                 className="h-full rounded-full bg-[#0F6B66] transition-all duration-500" 
                                 style={{ width: `${staffRate}%` }}
@@ -357,27 +395,27 @@ export default function Dashboard({
                         </div>
 
                         {/* Medicine Stocks */}
-                        <div className="bg-[#F8FAFC] p-2.5 rounded border border-slate-100 text-xs space-y-1 mb-4">
-                          <div className="text-[9px] text-[#64748B] font-semibold uppercase tracking-wider mb-1">Stock Projections</div>
+                        <div className="bg-[#F8FAFC] p-2 rounded-[6px] border border-slate-150/60 text-[11px] space-y-1 mb-3">
+                          <div className="text-[9px] text-[#64748B] font-semibold uppercase tracking-wider mb-0.5">{t('dashboard.grid.stockProjections')}</div>
                           <div className="flex justify-between">
                             <span className="text-[#64748B]">Paracetamol</span>
                             <span className={`font-mono ${paraDays < 3 ? 'text-[#D64545] font-semibold' : 'text-[#0F172A]'}`}>
-                              {medPara ? `${medPara.current_stock} Tab` : 'N/A'}{' '}
-                              <span className="text-[9px] text-[#64748B]">({paraDays === 999 ? 'Stable' : `${paraDays}d`})</span>
+                              {medPara ? `${medPara.current_stock} ${t('dashboard.grid.tab')}` : 'N/A'}{' '}
+                              <span className="text-[9px] text-[#64748B]">({paraDays === 999 ? t('dashboard.grid.stableDays') : `${paraDays}d`})</span>
                             </span>
                           </div>
                           <div className="flex justify-between">
                             <span className="text-[#64748B]">IV Fluids</span>
                             <span className={`font-mono ${ivDays < 3 ? 'text-[#D64545] font-semibold' : 'text-[#0F172A]'}`}>
-                              {medIv ? `${medIv.current_stock} Bot` : 'N/A'}{' '}
-                              <span className="text-[9px] text-[#64748B]">({ivDays === 999 ? 'Stable' : `${ivDays}d`})</span>
+                              {medIv ? `${medIv.current_stock} ${t('dashboard.grid.bot')}` : 'N/A'}{' '}
+                              <span className="text-[9px] text-[#64748B]">({ivDays === 999 ? t('dashboard.grid.stableDays') : `${ivDays}d`})</span>
                             </span>
                           </div>
                         </div>
 
                         {/* View Action */}
-                        <div className="pt-3 border-t border-slate-100 flex items-center justify-between text-[10px] font-semibold text-[#64748B] group-hover:text-[#1D4E89] transition-colors uppercase tracking-wider">
-                          <span>View Facility Comms</span>
+                        <div className="pt-2 border-t border-slate-100 flex items-center justify-between text-[9px] font-semibold text-[#64748B] group-hover:text-[#1D4E89] transition-colors uppercase tracking-wider">
+                          <span>{t('dashboard.grid.viewFacilityComms')}</span>
                           <svg className="w-3 h-3 transform group-hover:translate-x-1 transition-transform" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M9 5l7 7-7 7" />
                           </svg>
@@ -395,32 +433,67 @@ export default function Dashboard({
 
       {/* RIGHT COLUMN: SIDEBAR DETAILS (District Threat Matrix) */}
       <div className="space-y-6">
-        
-        {/* District Risk Panel */}
-        <div className="bg-white border border-slate-200 rounded-lg p-5 space-y-4">
-          <div>
-            <h3 className="text-xs font-semibold text-[#1D4E89] uppercase tracking-wider">
-              District Risk Index
+
+        {/* AI Response Engine entry point card */}
+        <div className="bg-white border border-[#E2E8F0] rounded-[8px] p-4 space-y-3 shadow-xs">
+          <div className="flex items-center justify-between">
+            <h3 className="text-xs font-bold text-[#0F172A] uppercase tracking-wider flex items-center gap-1.5">
+              <svg className="w-4 h-4 text-blue-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" />
+              </svg>
+              AI Response Engine
             </h3>
-            <p className="text-[10px] text-[#64748B] mt-0.5">Aggregated threat assessments</p>
+            <span className="h-2 w-2 rounded-full bg-blue-600 animate-pulse"></span>
           </div>
 
-          <div className="space-y-4">
+          <div className="space-y-1.5 text-xs text-[#64748B] leading-relaxed">
+            <div className="flex justify-between font-medium">
+              <span>Simulation Status:</span>
+              <span className="font-mono text-slate-700 font-bold">1 active scenario</span>
+            </div>
+            <div className="flex justify-between font-medium">
+              <span>Facilities at Risk:</span>
+              <span className={`font-mono font-bold ${criticalCount > 0 ? 'text-[#D64545]' : 'text-[#0f172a]'}`}>{criticalCount} PHCs</span>
+            </div>
+            <div className="flex justify-between font-medium">
+              <span>Proposed Transfers:</span>
+              <span className="font-mono text-blue-600 font-bold">{allRecommendations.length} pending</span>
+            </div>
+          </div>
+
+          <button
+            onClick={() => onSimulateResponse(null, null)}
+            className="w-full mt-2 py-1.5 px-3 bg-[#0F172A] hover:bg-slate-800 text-white font-bold text-[11px] rounded-[6px] flex items-center justify-center gap-1 cursor-pointer transition-colors shadow-xs"
+          >
+            Open Response Engine →
+          </button>
+        </div>
+        
+        {/* District Risk Panel */}
+        <div className="bg-white border border-[#E2E8F0] rounded-[8px] p-4 space-y-3 font-medium">
+          <div>
+            <h3 className="text-xs font-semibold text-[#0F172A] uppercase tracking-wider">
+              {t('dashboard.risk.title')}
+            </h3>
+            <p className="text-[10px] text-[#64748B] mt-0.5">{t('dashboard.risk.subtitle')}</p>
+          </div>
+
+          <div className="space-y-3">
             {districtList.map((dName) => {
               const riskInfo = calculateDistrictRisk(dName, diseaseReports, phcs, activeMeds, federatedModel);
               
               return (
                 <div key={dName} className="space-y-1">
                   <div className="flex justify-between items-baseline text-xs">
-                    <span className="font-heading font-semibold text-[#0F172A]">{dName} Node</span>
-                    <span className={`font-mono text-xs font-bold ${riskInfo.severity === 'CRITICAL' ? 'text-[#D64545]' : riskInfo.severity === 'HIGH' ? 'text-[#E8A33D]' : 'text-[#0F6B66]'}`}>
+                    <span className="font-sans font-medium text-[#475569]">{dName} {t('dashboard.risk.nodeSuffix')}</span>
+                    <span className={`font-mono text-[11px] font-bold ${riskInfo.severity === 'CRITICAL' ? 'text-[#D64545]' : riskInfo.severity === 'HIGH' ? 'text-[#E8A33D]' : 'text-[#0F6B66]'}`}>
                       {riskInfo.riskScore}% {riskInfo.severity}
                     </span>
                   </div>
-                  <div className="h-2 w-full bg-slate-100 rounded-full relative">
-                    <div className="absolute inset-0 bg-gradient-to-r from-emerald-600 via-[#E8A33D] to-[#D64545] rounded-full opacity-20"></div>
+                  <div className="h-1 w-full bg-slate-100 rounded-full relative">
+                    <div className="absolute inset-0 bg-gradient-to-r from-emerald-500 via-amber-500 to-red-500 rounded-full opacity-15"></div>
                     <div 
-                      className={`absolute top-1/2 -translate-y-1/2 h-3.5 w-1 rounded ${
+                      className={`absolute top-1/2 -translate-y-1/2 h-2 w-1.5 rounded-[1px] ${
                         riskInfo.severity === 'CRITICAL' ? 'bg-[#D64545]' : riskInfo.severity === 'HIGH' ? 'bg-[#E8A33D]' : 'bg-[#0F6B66]'
                       }`}
                       style={{ left: `${Math.min(96, Math.max(2, riskInfo.riskScore))}%` }}
@@ -433,10 +506,10 @@ export default function Dashboard({
         </div>
 
         {/* System Diagnostics explainer card */}
-        <div className="bg-white border border-slate-200 rounded-lg p-5 text-xs text-[#64748B] space-y-3">
-          <div className="font-semibold text-slate-700 uppercase tracking-wider text-[9px]">Platform Intel</div>
+        <div className="bg-white border border-[#E2E8F0] rounded-[8px] p-4 text-[11px] text-[#64748B] space-y-2">
+          <div className="font-semibold text-[#0F172A] uppercase tracking-wider text-[9px]">{t('dashboard.platformIntel.title')}</div>
           <p className="leading-relaxed">
-            Data aggregates hourly from secure edge PHC nodes. Model parameter transfers leverage MPC cryptography to verify state stocks.
+            {t('dashboard.platformIntel.desc')}
           </p>
         </div>
 

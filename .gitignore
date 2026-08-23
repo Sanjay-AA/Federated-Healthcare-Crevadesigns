@@ -74,3 +74,10 @@ skills-lock.json
 .env.local
 
 dist/
+
+# Firebase service account credentials
+*service-account*.json
+*credentials*.json
+serviceAccountKey.json
+*.key.json
+firebase-key*.json

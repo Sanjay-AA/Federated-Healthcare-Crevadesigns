@@ -1,3 +1,4 @@
+// Redistribution Algorithm - Connected to Real Firestore Stock & Safety Stock Levels
 import { predictDaysToStockOut } from './forecast';
 
 /**
@@ -28,18 +29,14 @@ export function getHaversineDistance(lat1, lon1, lat2, lon2) {
  */
 export function getRedistributionRecommendation(deficitPhc, medicineName, allPhcs, allMedicines) {
   // Find medicine record for the deficit PHC
-  const deficitMed = allMedicines.find(m => m.phc_id === deficitPhc.id && m.name === medicineName);
+  const deficitMed = allMedicines.find(m => m.phc_id === deficitPhc.id && (m.medicine_name === medicineName || m.name === medicineName));
   if (!deficitMed) return null;
 
-  // Calculate deficit PHC consumption metrics
-  const deficitHistory = deficitMed.consumption_history || [];
-  const deficitAvg = deficitHistory.length > 0
-    ? deficitHistory.slice(-7).reduce((sum, d) => sum + d.quantity_used, 0) / Math.min(7, deficitHistory.length)
-    : 1;
-
-  // Deficit target buffer is 14 days of average consumption
-  const deficitSafetyBuffer = Math.max(50, Math.round(deficitAvg * 14));
-  const deficitAmount = Math.max(0, deficitSafetyBuffer - deficitMed.current_stock);
+  // Recipient safety stock comes directly from Firestore reorder_level (fallback to 300 if missing)
+  const deficitSafetyStock = Number(deficitMed.reorder_level ?? 300);
+  const deficitAmount = Math.max(0, deficitSafetyStock - deficitMed.current_stock);
+  
+  // Only trigger redistribution if recipient stock is below safety stock or at risk
   if (deficitAmount <= 0) return null;
 
   const candidates = [];
@@ -48,33 +45,28 @@ export function getRedistributionRecommendation(deficitPhc, medicineName, allPhc
   allPhcs.forEach((candidatePhc) => {
     if (candidatePhc.id === deficitPhc.id) return;
 
-    // Get the candidate's medicine stock and consumption
-    const candidateMed = allMedicines.find(m => m.phc_id === candidatePhc.id && m.name === medicineName);
+    // Get the candidate's medicine stock
+    const candidateMed = allMedicines.find(m => m.phc_id === candidatePhc.id && (m.medicine_name === medicineName || m.name === medicineName));
     if (!candidateMed || candidateMed.current_stock <= 0) return;
 
-    // Check if candidate is at risk itself
+    // Protect donor PHCs that are themselves at risk
     const candidateDaysToStockOut = predictDaysToStockOut(candidateMed.consumption_history, candidateMed.current_stock);
-    if (candidateDaysToStockOut < 10) return; // Keep buffer for near-risk nodes
+    if (candidateDaysToStockOut <= 7) return; // Keep buffer for near-risk nodes
 
-    const candidateHistory = candidateMed.consumption_history || [];
-    const candidateAvg = candidateHistory.length > 0
-      ? candidateHistory.slice(-7).reduce((sum, d) => sum + d.quantity_used, 0) / Math.min(7, candidateHistory.length)
-      : 1;
-
-    // Safety buffer for candidate to ensure they remain safe (14-day supply)
-    const candidateSafetyBuffer = Math.max(50, Math.round(candidateAvg * 14));
-    const surplus = candidateMed.current_stock - candidateSafetyBuffer;
+    // Donor safety stock comes directly from Firestore reorder_level (fallback to 300)
+    const candidateSafetyStock = Number(candidateMed.reorder_level ?? 300);
+    const surplus = candidateMed.current_stock - candidateSafetyStock;
 
     if (surplus > 0) {
-      const distance = getHaversineDistance(
-        deficitPhc.lat,
-        deficitPhc.lng,
-        candidatePhc.lat,
-        candidatePhc.lng
-      );
+      // Prioritize simple geographic distance if lat/lng coords exist
+      const distance = (deficitPhc.lat && deficitPhc.lng && candidatePhc.lat && candidatePhc.lng)
+        ? getHaversineDistance(deficitPhc.lat, deficitPhc.lng, candidatePhc.lat, candidatePhc.lng)
+        : 10.0; // dummy default distance if coords missing
 
       candidates.push({
         phc: candidatePhc,
+        currentStock: candidateMed.current_stock,
+        safetyStock: candidateSafetyStock,
         surplus,
         distance
       });
@@ -101,11 +93,28 @@ export function getRedistributionRecommendation(deficitPhc, medicineName, allPhc
 
   if (transferQuantity <= 0) return null;
 
+  const daysLabel = deficitMed.status === "CRITICAL" ? "soon" : "shortly";
+
   return {
+    // Existing UI compatibility fields
     from_phc: bestDonor.phc,
     to_phc: deficitPhc,
     medicine: medicineName,
     quantity: Math.round(transferQuantity),
-    distance_km: parseFloat(bestDonor.distance.toFixed(1))
+    distance_km: parseFloat(bestDonor.distance.toFixed(1)),
+
+    // Phase 5 Result Contract Fields
+    recipientPhcId: deficitPhc.id,
+    donorPhcId: bestDonor.phc.id,
+    medicineId: deficitMed.id || deficitMed.medicine_id || "",
+    medicineName: medicineName,
+    recipientCurrentStock: deficitMed.current_stock,
+    recipientSafetyStock: deficitSafetyStock,
+    donorCurrentStock: bestDonor.currentStock,
+    donorSafetyStock: bestDonor.safetyStock,
+    donorSafeSurplus: Math.round(bestDonor.surplus),
+    recommendedTransferQuantity: Math.round(transferQuantity),
+    recipientRisk: deficitMed.status || "CRITICAL",
+    reason: `${deficitPhc.name} is predicted to stock out ${daysLabel}. ${bestDonor.phc.name} has ${Math.round(bestDonor.surplus)} tablets safely available above its safety stock of ${bestDonor.safetyStock} tablets. A transfer of ${Math.round(transferQuantity)} tablets is recommended.`
   };
 }
