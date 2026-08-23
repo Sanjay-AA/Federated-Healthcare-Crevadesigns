@@ -19,11 +19,12 @@ import DistrictsSummary from './pages/DistrictsSummary';
 import AlertsList from './pages/AlertsList';
 import BricsNetwork from './pages/BricsNetwork';
 import ResourceResponse from './pages/ResourceResponse';
+import IndiaDashboard from './pages/IndiaDashboard';
 
 function App() {
   const { language, setLanguage, t } = useLanguage();
   const [selectedPhc, setSelectedPhc] = useState(null);
-  const [activeTab, setActiveTab] = useState('dashboard');
+  const [activeTab, setActiveTab] = useState('india');
   const [simulationTarget, setSimulationTarget] = useState(null);
   const [districtFilter, setDistrictFilter] = useState('All');
   const [liveTimestamp, setLiveTimestamp] = useState('');
@@ -224,6 +225,19 @@ function App() {
           {/* Navigation Links */}
           <nav className="py-3 px-2 space-y-1">
             <button
+              onClick={() => handleNavClick('india')}
+              className={`w-full flex items-center gap-2.5 px-2.5 py-2 text-[13px] font-medium rounded-[6px] select-none cursor-pointer transition-all duration-150 ${
+                activeTab === 'india'
+                  ? 'bg-slate-100 text-[#0F172A] font-bold'
+                  : 'text-[#64748B] hover:text-[#0F172A] hover:bg-slate-50'
+              }`}
+            >
+              {/* Flag Emoji Icon */}
+              <span className="text-[17px] leading-none shrink-0 font-sans">🇮🇳</span>
+              {t('app.nav.india') || 'India Command'}
+            </button>
+
+            <button
               onClick={() => handleNavClick('dashboard')}
               className={`w-full flex items-center gap-2 px-2.5 py-2 text-[13px] font-medium rounded-[6px] select-none cursor-pointer transition-all duration-150 ${
                 activeTab === 'dashboard'
@@ -355,10 +369,14 @@ function App() {
             </button>
             <div>
               <h2 className="font-sans font-semibold text-[13px] md:text-[14px] text-[#0F172A] leading-tight">
-                {selectedState === 'Tamil Nadu' ? t('app.header.title') : `${selectedState} State Health Command Center`}
+                {activeTab === 'india' 
+                  ? 'India National Health Command Center' 
+                  : (selectedState === 'Tamil Nadu' ? t('app.header.title') : `${selectedState} State Health Command Center`)}
               </h2>
               <p className="text-[9px] text-[#64748B] font-medium uppercase tracking-wider mt-0.5">
-                {t('app.header.subtitle')}
+                {activeTab === 'india'
+                  ? 'National Health Mission · Resource Aggregator'
+                  : t('app.header.subtitle')}
               </p>
             </div>
           </div>
@@ -426,7 +444,29 @@ function App() {
             </div>
           )}
 
-          {activeTab === 'dashboard' ? (
+          {activeTab === 'india' ? (
+            <IndiaDashboard 
+              phcs={phcs}
+              medicines={medicines}
+              transfers={transfers}
+              districts={districts}
+              diseaseReports={diseaseReports}
+              loading={loading}
+              onSelectState={(stateName) => {
+                handleStateChange(stateName);
+                setActiveTab('dashboard');
+              }}
+              onSelectDistrict={(dist) => {
+                setDistrictFilter(dist);
+                setActiveTab('dashboard');
+              }}
+              onSelectPhc={(phc) => {
+                setSelectedPhc(phc);
+                setActiveTab('dashboard');
+              }}
+              onSimulateResponse={handleSimulateResponse}
+            />
+          ) : activeTab === 'dashboard' ? (
             selectedPhc ? (
               <PhcDetail 
                 phc={selectedPhc} 

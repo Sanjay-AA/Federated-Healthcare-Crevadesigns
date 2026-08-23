@@ -3,6 +3,7 @@
     "title": "Creva Health",
     "subtitle": "Federated Health Network",
     "nav": {
+      "india": "India National",
       "commandCenter": "Command Center",
       "districts": "Districts",
       "alerts": "Alerts",
