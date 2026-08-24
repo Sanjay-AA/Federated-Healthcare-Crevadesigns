@@ -3,6 +3,25 @@ rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
 
+    // Helper functions for user authorization
+    function getUserData() {
+      return get(/databases/$(database)/documents/users/$(request.auth.uid)).data;
+    }
+    
+    function isPHCOfficer() {
+      return request.auth != null && getUserData().role == 'PHC_INVENTORY_OFFICER';
+    }
+    
+    function getPHCId() {
+      return getUserData().phc_id;
+    }
+
+    match /users/{userId} {
+      allow read: if request.auth != null;
+      allow create, update: if request.auth != null && request.auth.uid == userId;
+      allow delete: if false;
+    }
+
     match /countries/{document} {
       allow read: if true;
       allow create, update: if true;
@@ -26,12 +45,15 @@ service cloud.firestore {
       allow create: if true;
       allow update: if request.resource.data.current_stock >= 0 
                     && request.resource.data.medicine_name == resource.data.medicine_name
-                    && request.resource.data.phc_id == resource.data.phc_id;
+                    && request.resource.data.phc_id == resource.data.phc_id
+                    && (request.auth == null || (isPHCOfficer() && getPHCId() == resource.data.phc_id));
       allow delete: if false;
     }
+    
     match /inventoryHistory/{document} {
       allow read: if true;
-      allow create: if true;
+      allow create: if request.resource.data.phc_id != null 
+                    && (request.auth == null || (isPHCOfficer() && getPHCId() == request.resource.data.phc_id));
       allow update: if false;
       allow delete: if false;
     }
